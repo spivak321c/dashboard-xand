@@ -19,18 +19,6 @@ interface NodeCardProps {
 
 export const NodeCard: React.FC<NodeCardProps> = ({ node, onNodeClick, copiedId, onCopy }) => {
     const [now] = useState(() => Date.now());
-    // Generate avatar color from pubkey
-    const getAvatarColor = (pubkey: string) => {
-        const hash = pubkey.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-        const colors = [
-            'bg-gradient-to-br from-purple-500 to-pink-500',
-            'bg-gradient-to-br from-blue-500 to-cyan-500',
-            'bg-gradient-to-br from-green-500 to-emerald-500',
-            'bg-gradient-to-br from-orange-500 to-red-500',
-            'bg-gradient-to-br from-indigo-500 to-purple-500',
-        ];
-        return colors[hash % colors.length];
-    };
 
     // Status badge config
     const getStatusConfig = () => {
@@ -68,16 +56,12 @@ export const NodeCard: React.FC<NodeCardProps> = ({ node, onNodeClick, copiedId,
             onClick={() => onNodeClick?.(node)}
             className="group relative bg-surface border border-border-subtle rounded-2xl p-6 hover:border-primary/30 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer min-h-[280px] flex flex-col"
         >
-            {/* Status Indicator - Left Edge */}
-            <div className={`absolute left-0 top-6 bottom-6 w-1 rounded-r-full ${node.status === 'active' || node.status === 'online' ? 'bg-emerald-500' :
-                node.status === 'delinquent' ? 'bg-amber-500' : 'bg-red-500'
-                }`} />
 
             {/* Header Area */}
             <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                     {/* Avatar */}
-                    <div className={`w-12 h-12 rounded-full ${getAvatarColor(node.pubkey)} flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-lg`}>
+                    <div className="w-12 h-12 rounded-full bg-elevated border border-border-subtle flex items-center justify-center text-text-primary font-bold text-sm flex-shrink-0 shadow-sm">
                         {node.pubkey.substring(0, 2).toUpperCase()}
                     </div>
 
@@ -116,8 +100,18 @@ export const NodeCard: React.FC<NodeCardProps> = ({ node, onNodeClick, copiedId,
                 {/* IP with Location */}
                 <div className="flex items-center gap-2 text-xs text-text-muted px-1">
                     <MapPin size={12} className="flex-shrink-0" />
-                    <span className="truncate">
-                        {node.ip || node.ip_address || 'N/A'} • {node.city || 'Unknown'}, {node.country || 'Unknown'}
+                    <span className="truncate flex items-center gap-2">
+                        {node.all_ips && node.all_ips.length > 1 ? (
+                            <>
+                                <span>{node.all_ips[0]}</span>
+                                <span className="bg-primary/20 text-primary px-1.5 py-0.5 rounded text-[9px] font-bold">
+                                    +{node.all_ips.length - 1} MORE
+                                </span>
+                            </>
+                        ) : (
+                            <span>{node.ip || node.ip_address || 'N/A'}</span>
+                        )}
+                        <span className="opacity-50">•</span> {node.city || 'Unknown'}, {node.country || 'Unknown'}
                     </span>
                 </div>
             </div>

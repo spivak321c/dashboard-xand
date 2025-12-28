@@ -16,6 +16,7 @@ import { StoragePlannerView } from './StoragePlannerView'; // Import StoragePlan
 import { Layout } from './ui/Layout';
 import { SettingsModal } from './ui/SettingsModal';
 import { Network, RefreshCw, Loader2 } from 'lucide-react';
+import { groupNodesByPubKey } from '../utils/nodeUtils';
 import { PNode } from '../types/node.types';
 import { ViewMode, AppSettings } from '../types';
 
@@ -52,7 +53,8 @@ function App() {
     try {
       setAllNodesLoading(true);
       const response = await apiService.getNodes({ page: 1, limit: 1000 }); // Fetch all nodes
-      setAllNodes(response.nodes);
+      const processedNodes = groupNodesByPubKey(response.nodes);
+      setAllNodes(processedNodes);
     } catch (err) {
       console.error('Error fetching all nodes:', err);
     } finally {
@@ -73,7 +75,7 @@ function App() {
 
   // UI State
   const [selectedNode, setSelectedNode] = useState<PNode | null>(null);
-  const [currentView, setCurrentView] = useState<ViewMode>(ViewMode.EXPLORER_3D);
+  const [currentView, setCurrentView] = useState<ViewMode>(ViewMode.DASHBOARD);
   const [isRefetching, setIsRefetching] = useState(false);
 
   // Handle Manual Refresh with animation state
@@ -127,103 +129,128 @@ function App() {
   };
 
   const renderContent = () => {
-    // If a node is selected, show the Detail Page immediately (acting as a sub-route)
+    // If a node is selected, show the Detail Page immediately (acting as a sub-route overlay)
+    // Note: NodeDetailView is typically an overlay, but here it replaces content. 
+    // If we want persistence, we should probably keep the underlying view mounted but hidden? 
+    // For now, let's allow NodeDetailView to take over, but for the main tabs, we persist them.
     if (selectedNode) {
-      // Exception: If in Earth View, we might want to keep context.
-      if (currentView !== ViewMode.EXPLORER_3D) {
+      // Exception: If in Earth View, we keep context in the Earth View component itself usually, 
+      // but here NodeDetailView is a full screen component. 
+      // If we want to return to exact state, simply unsetting selectedNode works.
+      // However, checking if we are in EarthView to show Panel vs View:
+      if (currentView === ViewMode.EXPLORER_3D) {
+        // In 3D mode, the DetailView is usually a side panel, not replacing the screen. 
+        // The current code structure had logic: calling <NodeDetailView> if NOT 3D.
+        // Let's preserve that logic but inside the persistence wrapper if possible, or just standard return.
+        // Actually, for 3D view specifically, the original code returned the <EarthView> with a <NodeDetailPanel>.
+        // So we don't return NodeDetailView here if 3D.
+      } else {
         return <NodeDetailView node={selectedNode} onBack={() => setSelectedNode(null)} />;
       }
     }
 
-    if (currentView === ViewMode.PLAYGROUND) {
-      return <PlaygroundView />;
-    }
-
-    if (currentView === ViewMode.DASHBOARD) {
-      return <Dashboard nodes={allNodes} onNodeClick={handleNodeClick} onNavigateToNodes={() => setCurrentView(ViewMode.NODES_LIST)} />;
-    }
-
-    if (currentView === ViewMode.NODES_LIST) {
-      return (
-        <NodesListView
-          nodes={nodes}
-          onNodeClick={handleNodeClick}
-          pagination={pagination}
-          currentPage={page}
-          onPageChange={setPage}
-        />
-      );
-    }
-
-    if (currentView === ViewMode.HISTORICAL_ANALYSIS) {
-      return <HistoricalAnalysis />;
-    }
-
-    if (currentView === ViewMode.PURCHASE) {
-      return <PurchaseView />;
-    }
-
-    if (currentView === ViewMode.ALERTS) {
-      return <AlertsView />;
-    }
-
-    if (currentView === ViewMode.STORAGE_PLANNER) {
-      return <StoragePlannerView />;
-    }
-
-    // EARTH VIEW LOGIC 
-
-    // Loading State (only on initial load)
-    if (loading && nodes.length === 0) {
-      return (
-        <div className="h-full w-full bg-root flex flex-col items-center justify-center text-text-primary transition-colors duration-500">
-          <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
-          <p className="text-primary font-mono text-sm tracking-widest animate-pulse">INITIALIZING EARTH VIEW...</p>
-        </div>
-      );
-    }
-
-    // Error State
-    if (error) {
-      return (
-        <div className="h-full w-full bg-root flex flex-col items-center justify-center text-text-primary p-6 transition-colors duration-500">
-          <div className="max-w-md w-full bg-surface backdrop-blur border border-red-500/30 rounded-xl p-8 text-center shadow-2xl">
-            <div className="inline-flex p-3 rounded-full bg-red-500/10 mb-4 text-red-500">
-              <Network className="w-6 h-6" />
-            </div>
-            <h3 className="text-lg font-semibold text-text-primary mb-2">Connection Failed</h3>
-            <p className="text-red-600 dark:text-red-400/80 text-sm mb-6">{error}</p>
-            <button
-              onClick={() => refetch()}
-              className="px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg transition-all shadow-lg shadow-red-500/20 flex items-center justify-center mx-auto"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" /> Retry Connection
-            </button>
-          </div>
-        </div>
-      );
-    }
+    // Helper for persistence. 
+    // We render ALL heavy views, but hide them with CSS if not active.
+    // Lighter views can be conditional if needed, but persistence is requested for "going back".
 
     return (
-      <div className="w-full h-full overflow-hidden bg-root relative transition-colors duration-500">
-        <EarthView
-          nodes={allNodes}
-          onNodeClick={handleNodeClick}
-          selectedNodeId={selectedNode?.pubkey}
-          lastUpdated={lastUpdated}
-          refetch={fetchAllNodes}
-          isRefetching={allNodesLoading}
-        />
+      <div className="w-full h-full relative">
+        {/* DASHBOARD */}
+        <div style={{ display: currentView === ViewMode.DASHBOARD && !selectedNode ? 'block' : 'none', height: '100%' }}>
+          <Dashboard nodes={allNodes} onNodeClick={handleNodeClick} onNavigateToNodes={() => setCurrentView(ViewMode.NODES_LIST)} />
+        </div>
 
-        {/* We keep the Sidebar Panel ONLY for Earth View context preservation */}
-        <NodeDetailPanel
-          node={selectedNode}
-          onClose={() => setSelectedNode(null)}
-          allNodes={nodes} // Pass all nodes to calculate gossip peers
-        />
+        {/* NODES LIST */}
+        <div style={{ display: currentView === ViewMode.NODES_LIST && !selectedNode ? 'block' : 'none', height: '100%' }}>
+          <NodesListView
+            nodes={nodes}
+            onNodeClick={handleNodeClick}
+            pagination={pagination}
+            currentPage={page}
+            onPageChange={setPage}
+          />
+        </div>
+
+        {/* EARTH VIEW */}
+        <div style={{ display: currentView === ViewMode.EXPLORER_3D ? 'block' : 'none', height: '100%' }}>
+          {/* Loading State for Earth View specifically if needed, or stick to global loading? 
+               Original code had specific loading return. Let's keep it simple. */}
+          {loading && nodes.length === 0 && currentView === ViewMode.EXPLORER_3D ? (
+            <div className="h-full w-full bg-root flex flex-col items-center justify-center text-text-primary">
+              <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
+              <p className="text-primary font-mono text-sm tracking-widest animate-pulse">INITIALIZING EARTH VIEW...</p>
+            </div>
+          ) : (
+            <div className="w-full h-full relative">
+              <EarthView
+                nodes={allNodes}
+                onNodeClick={handleNodeClick}
+                selectedNodeId={selectedNode?.pubkey}
+                lastUpdated={lastUpdated}
+                refetch={fetchAllNodes}
+                isRefetching={allNodesLoading}
+              />
+              {/* Panel provided for 3D view context */}
+              <NodeDetailPanel
+                node={selectedNode}
+                onClose={() => setSelectedNode(null)}
+                allNodes={nodes}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* OTHER VIEWS (Conditional is okay if they don't have complex state, but user asked for state maintenance. 
+            Playground has text input state likely. Alerts might have scroll. 
+            Let's persist Playground, Alerts, Historical, StoragePlanner, Purchase too.) 
+        */}
+
+        <div style={{ display: currentView === ViewMode.PLAYGROUND && !selectedNode ? 'block' : 'none', height: '100%' }}>
+          <PlaygroundView />
+        </div>
+
+        <div style={{ display: currentView === ViewMode.HISTORICAL_ANALYSIS && !selectedNode ? 'block' : 'none', height: '100%' }}>
+          <HistoricalAnalysis />
+        </div>
+
+        <div style={{ display: currentView === ViewMode.PURCHASE && !selectedNode ? 'block' : 'none', height: '100%' }}>
+          <PurchaseView />
+        </div>
+
+        <div style={{ display: currentView === ViewMode.ALERTS && !selectedNode ? 'block' : 'none', height: '100%' }}>
+          <AlertsView />
+        </div>
+
+        <div style={{ display: currentView === ViewMode.STORAGE_PLANNER && !selectedNode ? 'block' : 'none', height: '100%' }}>
+          <StoragePlannerView />
+        </div>
+
+        {/* Error State Overlay if needed? 
+            Original code returned Error State globally. 
+            If error exists, we might want to show it. 
+            But pure persistence means avoiding unmounts. 
+            We can overlay the error.
+        */}
+        {error && (
+          <div className="absolute inset-0 z-50 bg-root/90 backdrop-blur-sm flex items-center justify-center">
+            <div className="max-w-md w-full bg-surface border border-red-500/30 rounded-xl p-8 text-center shadow-2xl">
+              <div className="inline-flex p-3 rounded-full bg-red-500/10 mb-4 text-red-500">
+                <Network className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-semibold text-text-primary mb-2">Connection Failed</h3>
+              <p className="text-red-600 dark:text-red-400/80 text-sm mb-6">{error}</p>
+              <button
+                onClick={() => refetch()}
+                className="px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg transition-all shadow-lg shadow-red-500/20 flex items-center justify-center mx-auto"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" /> Retry Connection
+              </button>
+            </div>
+          </div>
+        )}
+
       </div>
     );
-
   };
 
   return (

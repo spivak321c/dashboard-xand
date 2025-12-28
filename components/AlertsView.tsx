@@ -35,6 +35,26 @@ export const AlertsView: React.FC = () => {
         setWebhookUrl('');
     };
 
+    const handleEdit = (alert: Alert) => {
+        setSelectedAlert(alert);
+        setIsCreating(true);
+        setName(alert.name);
+
+        // Map backend types back to UI form
+        if (alert.rule_type === 'node_status') setConditionType('status');
+        else if (alert.rule_type === 'storage_threshold') setConditionType('storage');
+        else if (alert.rule_type === 'latency_spike') setConditionType('latency');
+
+        setConditionValue(alert.conditions.value?.toString() || '');
+        setTargetType(alert.conditions.target_type || 'global');
+        setTargetNodeId(alert.conditions.node_id || '');
+
+        if (alert.actions && alert.actions.length > 0) {
+            setChannel(alert.actions[0].type as 'discord' | 'webhook' | 'email');
+            setWebhookUrl(alert.actions[0].config.url || '');
+        }
+    };
+
     const handleSave = async () => {
         setSaving(true);
         try {
@@ -68,8 +88,13 @@ export const AlertsView: React.FC = () => {
                 cooldown_minutes: 15
             };
 
-            await createAlert(newAlert);
+            if (selectedAlert) {
+                await updateAlert(selectedAlert.id, newAlert);
+            } else {
+                await createAlert(newAlert);
+            }
             setIsCreating(false);
+            setSelectedAlert(null);
         } catch (err) {
             console.error(err);
             alert('Failed to save alert');
@@ -119,7 +144,7 @@ export const AlertsView: React.FC = () => {
             } else {
                 alert("Invalid configuration JSON: Missing name or rule_type");
             }
-        } catch (e) {
+        } catch {
             alert("Invalid configuration JSON");
         }
     };
@@ -217,13 +242,17 @@ export const AlertsView: React.FC = () => {
                                     <Loader2 className="w-8 h-8 animate-spin text-primary opacity-50" />
                                 </div>
                             ) : alerts.map(alert => (
-                                <div key={alert.id} className="bg-surface border border-border-subtle rounded-xl p-5 hover:border-primary/50 transition-all shadow-sm group relative">
+                                <div
+                                    key={alert.id}
+                                    onClick={() => handleEdit(alert)}
+                                    className={`bg-surface border ${selectedAlert?.id === alert.id ? 'border-primary shadow-md' : 'border-border-subtle'} rounded-xl p-5 hover:border-primary/50 transition-all shadow-sm group relative cursor-pointer`}
+                                >
                                     <div className="flex justify-between items-start mb-3">
                                         <div className="flex items-center">
                                             <div className={`w-2 h-2 rounded-full mr-2 ${alert.enabled ? 'bg-secondary animate-pulse' : 'bg-text-muted'}`}></div>
                                             <h3 className="font-bold text-text-primary">{alert.name}</h3>
                                         </div>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                                             <label className="relative inline-flex items-center cursor-pointer">
                                                 <input
                                                     type="checkbox"
@@ -250,7 +279,10 @@ export const AlertsView: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    <div className="absolute top-4 right-14 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-surface p-1 rounded-lg border border-border-subtle shadow-lg">
+                                    <div className="absolute top-4 right-14 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-surface p-1 rounded-lg border border-border-subtle shadow-lg" onClick={(e) => e.stopPropagation()}>
+                                        <button onClick={() => handleEdit(alert)} className="p-1.5 hover:bg-overlay-hover rounded text-text-muted hover:text-primary" title="Edit/View">
+                                            <Eye size={14} />
+                                        </button>
                                         <button onClick={() => exportConfig(alert)} className="p-1.5 hover:bg-overlay-hover rounded text-text-muted hover:text-primary" title="Share Config">
                                             {snippetCopied ? <Check size={14} /> : <Share2 size={14} />}
                                         </button>
@@ -281,7 +313,7 @@ export const AlertsView: React.FC = () => {
                             <div className="space-y-4">
                                 <div className="flex items-center gap-4 mb-2">
                                     <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-sm">1</div>
-                                    <h2 className="text-lg font-bold text-text-primary">Sentinel Identity</h2>
+                                    <h2 className="text-lg font-bold text-text-primary">{selectedAlert ? 'Edit Sentinel Identity' : 'Sentinel Identity'}</h2>
                                 </div>
                                 <div className="pl-12">
                                     <label className="text-xs font-bold text-text-muted uppercase mb-2 block">Rule Name</label>
@@ -404,23 +436,20 @@ export const AlertsView: React.FC = () => {
                                         </button>
                                     </div>
 
-                                    <div>
-                                        <label className="text-xs font-bold text-text-muted uppercase mb-2 block">
-                                            {channel === 'discord' ? 'Discord Webhook URL' : 'Endpoint URL'}
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={webhookUrl}
-                                            onChange={(e) => setWebhookUrl(e.target.value)}
-                                            className="w-full bg-surface border border-border-subtle rounded-lg p-3 text-text-primary focus:border-primary outline-none font-mono text-sm"
-                                            placeholder="https://..."
-                                        />
-                                        {channel === 'discord' && (
-                                            <p className="text-[10px] text-text-muted mt-2">
-                                                Go to Server Settings → Integrations → Webhooks to generate a URL.
-                                            </p>
-                                        )}
-                                    </div>
+                                    {channel === 'webhook' && (
+                                        <div>
+                                            <label className="text-xs font-bold text-text-muted uppercase mb-2 block">
+                                                Endpoint URL
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={webhookUrl}
+                                                onChange={(e) => setWebhookUrl(e.target.value)}
+                                                className="w-full bg-surface border border-border-subtle rounded-lg p-3 text-text-primary focus:border-primary outline-none font-mono text-sm"
+                                                placeholder="https://..."
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -433,10 +462,10 @@ export const AlertsView: React.FC = () => {
                                 </button>
                                 <button
                                     onClick={handleSave}
-                                    disabled={!name || !webhookUrl || saving}
-                                    className={`px-8 py-3 rounded-xl font-bold text-white shadow-lg transition-all flex items-center ${!name || !webhookUrl || saving ? 'bg-border-strong cursor-not-allowed' : 'bg-gradient-primary hover:brightness-110 shadow-primary/20'}`}
+                                    disabled={!name || (channel === 'webhook' && !webhookUrl) || saving}
+                                    className={`px-8 py-3 rounded-xl font-bold text-white shadow-lg transition-all flex items-center ${!name || (channel === 'webhook' && !webhookUrl) || saving ? 'bg-border-strong cursor-not-allowed' : 'bg-gradient-primary hover:brightness-110 shadow-primary/20'}`}
                                 >
-                                    {saving ? <Loader2 size={18} className="mr-2 animate-spin" /> : <Save size={18} className="mr-2" />} Save Sentinel
+                                    {saving ? <Loader2 size={18} className="mr-2 animate-spin" /> : <Save size={18} className="mr-2" />} {selectedAlert ? 'Update Sentinel' : 'Save Sentinel'}
                                 </button>
                             </div>
 

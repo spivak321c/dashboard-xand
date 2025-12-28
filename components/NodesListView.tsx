@@ -12,6 +12,7 @@ import {
   List as ListIcon
 } from 'lucide-react';
 import { NodeCard } from './NodeCard';
+import { NodeHybridCard } from './NodeHybridCard';
 
 interface NodesListViewProps {
   nodes: PNode[];
@@ -39,6 +40,7 @@ export const NodesListView: React.FC<NodesListViewProps> = ({ nodes, onNodeClick
   // Sort States
   const [sortField] = useState<SortField>('storage_capacity');
   const [sortDirection] = useState<SortDirection>('desc');
+  const [expandedNodeId, setExpandedNodeId] = useState<string | null>(null);
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -234,9 +236,24 @@ export const NodesListView: React.FC<NodesListViewProps> = ({ nodes, onNodeClick
             )}
           </div>
         ) : (
-          /* List View - Compact table fallback */
-          <div className="text-center text-text-muted py-12">
-            List view coming soon. Use Grid view for now.
+          /* List View - Expanded Hybrid Cards */
+          <div className="flex flex-col gap-3">
+            {filteredAndSortedNodes.map(node => (
+              <NodeHybridCard
+                key={node.pubkey}
+                node={node}
+                isExpanded={expandedNodeId === node.pubkey}
+                onToggleExpand={() => setExpandedNodeId(expandedNodeId === node.pubkey ? null : node.pubkey)}
+                onCopyProp={handleCopy}
+                copiedId={copiedId}
+                onNodeClick={onNodeClick}
+              />
+            ))}
+            {filteredAndSortedNodes.length === 0 && (
+              <div className="p-12 text-center text-text-muted border border-dashed border-border-subtle rounded-xl">
+                No nodes found matching your filters.
+              </div>
+            )}
           </div>
         )}
       </div>

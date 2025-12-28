@@ -3,6 +3,7 @@ import { PNode } from '../types/node.types';
 import { apiService } from '../services/api';
 import { AppSettings } from '../types';
 import { PaginationMeta } from '../types/api.types';
+import { groupNodesByPubKey } from '../utils/nodeUtils';
 
 export function useNodes(settings?: AppSettings) {
   const [nodes, setNodes] = useState<PNode[]>([]);
@@ -21,10 +22,10 @@ export function useNodes(settings?: AppSettings) {
       // Fetch nodes from backend API with pagination support
       const response = await apiService.getNodes({ page, limit });
 
-      // Deduplicate nodes based on pubkey just in case
-      const uniqueNodes = Array.from(new Map(response.nodes.map(node => [node.pubkey, node])).values());
+      // Deduplicate nodes based on pubkey and group IPs
+      const processedNodes = groupNodesByPubKey(response.nodes);
 
-      setNodes(uniqueNodes);
+      setNodes(processedNodes);
       setPagination(response.pagination);
       setLastUpdated(new Date());
       setError(null);

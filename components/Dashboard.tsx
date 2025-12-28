@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { PNode } from '../types/node.types';
 import { NetworkStats, LatencyDistribution } from '../types/api.types';
 import { apiService } from '../services/api';
 import { useDashboardMetrics } from '../hooks/useDashboardMetrics';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, AreaChart, Area, ReferenceLine } from 'recharts';
-import { Server, Activity, Globe, Wifi, Zap, Cpu, TrendingUp, AlertTriangle, CheckCircle, RefreshCw, LayoutDashboard, Eye, EyeOff, HardDrive, ChevronUp, ChevronDown, Loader2, Layers } from 'lucide-react';
+import { Server, Activity, Globe, Wifi, Zap, Cpu, TrendingUp, AlertTriangle, CheckCircle, RefreshCw, LayoutDashboard, Eye, EyeOff, HardDrive, ChevronUp, ChevronDown, Loader2, Layers, Lock } from 'lucide-react';
 import { StorageUsageChart } from './StorageUsageChart';
 
 interface DashboardProps {
@@ -25,30 +25,35 @@ interface StatCardProps {
 }
 
 const StatCard = ({ label, value, subtext, icon: Icon, trend, trendColor }: StatCardProps) => (
-  <div className="bg-surface border border-border-subtle rounded-2xl p-6 relative overflow-hidden shadow-lg">
+  <div className="bg-surface border border-border-subtle rounded-xl p-4 relative overflow-hidden shadow-lg min-h-[140px] flex flex-col justify-between group hover:border-primary/40 transition-all duration-300">
     {/* Decorative blur */}
-    <div className="absolute -top-10 -right-10 w-24 h-24 bg-primary-soft rounded-full blur-2xl"></div>
+    <div className="absolute -top-10 -right-10 w-24 h-24 bg-primary-soft rounded-full blur-2xl opacity-50 group-hover:opacity-80 transition-opacity"></div>
 
-    <div className="flex justify-between items-start relative z-10">
-      <div>
-        <p className="text-text-secondary text-xs font-semibold uppercase tracking-widest mb-2">{label}</p>
-        <h3 className="text-3xl font-bold text-text-primary font-mono tracking-tight">{value}</h3>
-        {subtext && <div className="text-text-muted text-xs mt-2 font-medium bg-overlay-hover inline-block px-2 py-1 rounded">{subtext}</div>}
+    <div className="relative z-10 flex flex-col h-full">
+      <div className="flex justify-between items-start mb-2">
+        <div className="p-2 bg-overlay-hover rounded-lg text-text-primary border border-overlay-active">
+          <Icon size={18} />
+        </div>
+        {trend && (
+          <div className={`text-[10px] font-mono font-bold ${trendColor || 'text-secondary'} flex items-center bg-overlay-hover px-1.5 py-0.5 rounded`}>
+            <Zap size={8} className="mr-1" />
+            {trend > 0 ? '+' : ''}{trend}%
+          </div>
+        )}
       </div>
-      <div className="p-3 bg-overlay-hover rounded-xl text-text-primary border border-overlay-active">
-        <Icon size={22} />
+
+      <div>
+        <p className="text-text-secondary text-[10px] font-bold uppercase tracking-wider mb-1 truncate">{label}</p>
+        <div className="flex items-baseline gap-1">
+          <h3 className="text-2xl font-black text-text-primary font-mono tracking-tight">{value}</h3>
+        </div>
+        {subtext && (
+          <div className="text-text-muted text-[9px] mt-1 font-medium truncate opacity-80">
+            {subtext}
+          </div>
+        )}
       </div>
     </div>
-
-    {trend && (
-      <div className="mt-4 flex items-center text-xs font-mono border-t border-border-subtle pt-3">
-        <span className={`font-bold ${trendColor || 'text-secondary'} flex items-center`}>
-          <Zap size={10} className="mr-1" />
-          {trend > 0 ? '+' : ''}{trend}%
-        </span>
-        <span className="text-text-muted ml-2">vs epoch 419</span>
-      </div>
-    )}
   </div>
 );
 
@@ -175,31 +180,49 @@ export const Dashboard: React.FC<DashboardProps> = ({ nodes, onNodeClick, onNavi
   const [sortMetric, setSortMetric] = useState<'rank' | 'latency' | 'score' | 'credit'>('rank');
 
   // New analytics metrics
-  const { metrics, loading: metricsLoading, refresh } = useDashboardMetrics();
+  const { metrics, loading: metricsLoading, refresh: refreshMetrics } = useDashboardMetrics();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showLatencyChart, setShowLatencyChart] = useState(false);
 
+  // Shared fetcher that returns data instead of setting state directly
+  const loadStatsData = useCallback(async () => {
+    return Promise.all([
+      apiService.getStats(),
+      apiService.getLatencyDistribution()
+    ]);
+  }, []);
+
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
-    await refresh();
+    try {
+      const [statsData, latencyData] = await loadStatsData();
+      setStats(statsData);
+      setLatencyDist(latencyData);
+      await refreshMetrics();
+    } catch (error) {
+      console.error("Refresh failed:", error);
+    }
     setTimeout(() => setIsRefreshing(false), 800);
   };
 
   useEffect(() => {
-    const fetchData = async () => {
+    let ignore = false;
+
+    const init = async () => {
       try {
-        const [statsData, latencyData] = await Promise.all([
-          apiService.getStats(),
-          apiService.getLatencyDistribution()
-        ]);
-        setStats(statsData);
-        setLatencyDist(latencyData);
+        const [statsData, latencyData] = await loadStatsData();
+        if (!ignore) {
+          setStats(statsData);
+          setLatencyDist(latencyData);
+        }
       } catch (error) {
         console.error("Failed to fetch dashboard stats", error);
       }
     };
-    fetchData();
-  }, []);
+
+    init();
+    return () => { ignore = true; };
+  }, [loadStatsData]);
 
   // Use props nodes as fallback or for side calculations
   const regionData = nodes.reduce((acc: Record<string, number>, node) => {
@@ -230,8 +253,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ nodes, onNodeClick, onNavi
   const totalStorageTB = stats ? stats.total_storage_pb * 1000 : nodes.reduce((acc, n) => acc + ((n.storage_capacity ?? 0) / 1e12), 0);
   const usedStorageTB = stats ? stats.used_storage_pb * 1000 : nodes.reduce((acc, n) => acc + ((n.storage_used ?? 0) / 1e12), 0);
 
-  // Calculate average latency from nodes as a fallback or additional metric
-  const calculatedAvgLatency = Math.round(nodes.reduce((acc, n) => acc + (n.response_time || n.latency_ms || 0), 0) / (nodes.length || 1));
   const avgPerformance = stats?.average_performance ?? 0;
 
   // Safe storage values for per-node display
@@ -273,32 +294,39 @@ export const Dashboard: React.FC<DashboardProps> = ({ nodes, onNodeClick, onNavi
       </div>
 
       {/* Top Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-7 gap-4 md:gap-6">
+        <StatCard
+          label="Total Nodes"
+          value={stats?.total_nodes ?? nodes.length}
+          icon={Server}
+        />
         <StatCard
           label="Online Nodes"
           value={activeNodesCount}
-          subtext={`Total: ${stats?.total_nodes ?? nodes.length}`}
-          icon={Server}
-          trend={12}
+          subtext={`${stats?.total_nodes ? ((activeNodesCount / stats.total_nodes) * 100).toFixed(1) : 0}% Online`}
+          icon={Wifi}
           trendColor="text-emerald-500"
         />
         <StatCard
           label="Offline Nodes"
-          value={(stats?.total_nodes ?? nodes.length) - activeNodesCount}
-          subtext={`${((((stats?.total_nodes ?? nodes.length) - activeNodesCount) / ((stats?.total_nodes ?? nodes.length) || 1)) * 100).toFixed(1)}% of total`}
+          value={stats?.offline_nodes ?? (nodes.length - activeNodesCount)}
+          subtext="Inactive"
           icon={AlertTriangle}
           trendColor="text-red-500"
         />
         <StatCard
-          label="Global Capacity"
-          value={`${totalStorageTB.toFixed(0)} TB`}
-          subtext={`${((usedStorageTB / (totalStorageTB || 1)) * 100).toFixed(6)}% Utilized`}
-          icon={HardDrive}
-          trend={8.2}
-          trendColor="text-secondary"
+          label="Public Nodes"
+          value={stats?.public_nodes ?? '-'}
+          subtext="Public Access"
+          icon={Globe}
         />
         <StatCard
-          label="Network Health Score"
+          label="Private Nodes"
+          value={stats?.private_nodes ?? '-'}
+          icon={Lock}
+        />
+        <StatCard
+          label="Health Score"
           value={`${avgPerformance.toFixed(1)}`}
           subtext="Overall Network"
           icon={Activity}

@@ -108,6 +108,7 @@ export interface PNode {
     credits: number;
     credits_rank: number;
     credits_change: number;
+    all_ips?: string[];
     total_stake: number;
     commission: number;
     apy: number;

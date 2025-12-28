@@ -178,8 +178,16 @@ export const NodeDetailView: React.FC<NodeDetailViewProps> = ({ node, onBack }) 
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-[10px] text-text-muted uppercase">IP Address</label>
-                                    <div className="font-mono text-sm">{node.ip}</div>
+                                    <label className="text-[10px] text-text-muted uppercase">IP Addresses</label>
+                                    <div className="flex flex-col gap-1 mt-1">
+                                        {node.all_ips && node.all_ips.length > 0 ? (
+                                            node.all_ips.map((ip, idx) => (
+                                                <div key={idx} className="font-mono text-sm">{ip}</div>
+                                            ))
+                                        ) : (
+                                            <div className="font-mono text-sm">{node.ip || 'N/A'}</div>
+                                        )}
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="text-[10px] text-text-muted uppercase">Version</label>

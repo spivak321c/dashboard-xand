@@ -27,22 +27,22 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, onViewCha
         <div className="h-full px-4 lg:px-8 flex items-center justify-between">
 
           {/* Logo Section */}
-          <div className="flex items-center gap-4 min-w-max group cursor-pointer">
+          <div
+            className="flex items-center gap-4 min-w-max group cursor-pointer"
+            onClick={() => handleNavClick(ViewMode.DASHBOARD)}
+          >
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-soft to-surface flex items-center justify-center border border-primary/20 shadow-[0_0_20px_var(--color-primary-soft)] transition-transform group-hover:scale-105">
               <Network className="w-6 h-6 text-primary" />
             </div>
             <div>
               <span className="font-extrabold text-xl tracking-tight text-text-primary block leading-none">
-                XANDEUM
-              </span>
-              <span className="text-[10px] uppercase tracking-[0.25em] text-primary font-bold opacity-80 group-hover:opacity-100 transition-opacity">
-                Explorer
+                XANDXPLORER
               </span>
             </div>
           </div>
 
           {/* Center Navigation - Desktop */}
-          <nav className="hidden lg:flex flex-1 items-center justify-center px-8 gap-1 overflow-x-auto custom-scrollbar">
+          <nav className="hidden lg:flex flex-1 items-center justify-start px-8 gap-1 overflow-x-auto custom-scrollbar">
             <NavItem icon={<LayoutDashboard size={18} />} label="Dashboard" isActive={currentView === ViewMode.DASHBOARD} onClick={() => handleNavClick(ViewMode.DASHBOARD)} />
             <NavItem icon={<List size={18} />} label="Nodes" isActive={currentView === ViewMode.NODES_LIST} onClick={() => handleNavClick(ViewMode.NODES_LIST)} />
             <NavItem icon={<Globe size={18} />} label="Topology" isActive={currentView === ViewMode.EXPLORER_3D} onClick={() => handleNavClick(ViewMode.EXPLORER_3D)} />
@@ -57,10 +57,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, onViewCha
           {/* Right Actions */}
           <div className="flex items-center gap-3 min-w-max">
             <div className="hidden md:flex items-center space-x-4 text-xs font-mono text-text-secondary bg-surface/50 backdrop-blur-sm px-4 py-2 rounded-full border border-border-subtle shadow-inner">
-              <span className="flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full shadow-[0_0_8px_currentColor] ${network === 'mainnet' ? 'bg-secondary text-secondary' : 'bg-accent text-accent'} animate-pulse`}></span>
-                <span className="font-bold tracking-wide">{network === 'mainnet' ? 'MAINNET' : 'DEVNET'}</span>
-              </span>
+
               {lastUpdated && (
                 <>
                   <span className="w-px h-3 bg-border-subtle"></span>
@@ -138,7 +135,7 @@ const NavItem: React.FC<{ icon: React.ReactNode; label: string; isActive: boolea
   return (
     <button
       onClick={onClick}
-      className={`flex items-center px-4 py-2 rounded-lg transition-all duration-300 group relative overflow-hidden ${isActive
+      className={`flex items-center px-4 py-2 rounded-lg transition-all duration-300 group relative ${isActive
         ? 'text-primary bg-primary-soft/30'
         : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'
         }`}
@@ -149,7 +146,7 @@ const NavItem: React.FC<{ icon: React.ReactNode; label: string; isActive: boolea
       <div className={`transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
         {icon}
       </div>
-      <span className={`ml-2.5 font-medium text-xs tracking-wide transition-colors ${isActive ? 'font-bold' : ''}`}>{label}</span>
+      <span className={`ml-2.5 font-medium text-xs tracking-wide whitespace-nowrap transition-colors ${isActive ? 'font-bold' : ''}`}>{label}</span>
     </button>
   );
 };

@@ -63,7 +63,7 @@ const FlatMap: React.FC<{
 
   // Zoom & Pan State
   const containerRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
+  const [scale, setScale] = useState(1.8);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0 });
@@ -105,54 +105,7 @@ const FlatMap: React.FC<{
     return '';
   };
 
-  // Generate Gossip Links (Memoized)
-  const gossipLinks = useMemo(() => {
-    const links: { source: PNode, target: PNode, type: 'local' | 'global' }[] = [];
-    const regionMap = new Map<string, PNode[]>();
-
-    nodes.forEach(n => {
-      // Use new fields with fallback for robustness
-      const region = n.city || n.country || n.geo_info?.region || 'unknown';
-      // Grouping by city/region as proxy for now
-      if (!regionMap.has(region)) regionMap.set(region, []);
-      regionMap.get(region)?.push(n);
-    });
-
-    // Local Cluster connections
-    regionMap.forEach((regionNodes) => {
-      for (let i = 0; i < regionNodes.length; i++) {
-        // Connect to next 2 nodes in the list for a ring-like cluster
-        for (let j = 1; j <= 2; j++) {
-          const target = regionNodes[(i + j) % regionNodes.length];
-          // Use id or pubkey
-          const sId = regionNodes[i].pubkey;
-          const tId = target.pubkey;
-
-          if (tId !== sId) {
-            links.push({ source: regionNodes[i], target: target, type: 'local' });
-          }
-        }
-      }
-    });
-
-    // Global Bridge connections
-    nodes.forEach((n) => {
-      // 5% chance to connect to a random node in a different region (deterministic)
-      if (getPseudoRandom(n.pubkey + 'global') < 0.05) {
-        // Pick a target based on pseudo-random index
-        const randIndex = Math.floor(getPseudoRandom(n.pubkey + 'target') * nodes.length);
-        const randomTarget = nodes[randIndex];
-        const nRegion = n.city || n.country;
-        const tRegion = randomTarget.city || randomTarget.country;
-
-        if (nRegion !== tRegion) {
-          links.push({ source: n, target: randomTarget, type: 'global' });
-        }
-      }
-    });
-
-    return links;
-  }, [nodes]);
+  // Generate Gossip Links (Memoized) - REMOVED for clarity as requested
 
 
   // --- Zoom Handlers ---
@@ -266,12 +219,12 @@ const FlatMap: React.FC<{
           }}
           className="relative"
         >
-          <div className="relative w-[1000px] h-[500px] max-w-none select-none p-4">
+          <div className="relative w-[1200px] h-[600px] max-w-none select-none p-4">
 
             {/* World Map SVG */}
             <svg viewBox="0 0 1000 500" className="w-full h-full filter drop-shadow-2xl">
-              {/* Background Ocean */}
-              <rect width="1000" height="500" rx="12" className="fill-surface" />
+              {/* Background Ocean - Darker in light mode for better contrast */}
+              <rect width="1000" height="500" rx="12" className="fill-surface dark:fill-surface" style={{ fill: 'var(--bg-root)' }} />
 
               {/* Grid Lines */}
               <path d="M0,250 L1000,250" className="stroke-border-subtle" strokeWidth="1" strokeDasharray="4 4" opacity="0.5" />
@@ -283,39 +236,16 @@ const FlatMap: React.FC<{
                   key={i}
                   d={generatePath(feature.geometry.coordinates, feature.geometry.type)}
                   strokeWidth="0.5"
-                  className="fill-elevated stroke-border-strong hover:fill-overlay-active transition-colors duration-300"
+                  className="fill-elevated stroke-border-strong hover:fill-overlay-active transition-colors duration-300 dark:fill-elevated dark:stroke-border-strong"
+                  style={{
+                    fill: 'var(--bg-elevated)',
+                    stroke: 'var(--border-strong)'
+                  }}
                 />
               ))}
             </svg>
 
-            {/* Gossip Links Layer (SVG Overlay) */}
-            <svg viewBox="0 0 1000 500" className="absolute inset-0 w-full h-full pointer-events-none overflow-visible m-4">
-              {gossipLinks.map((link, i) => {
-                const sourcePos = project(link.source.lat || 0, link.source.lon || 0);
-                const targetPos = project(link.target.lat || 0, link.target.lon || 0);
-
-                // Convert percentages to SVG units (1000x500 viewBox)
-                // x% of 1000 is x*10
-                const x1 = sourcePos.x * 10;
-                const y1 = sourcePos.y * 5;
-                const x2 = targetPos.x * 10;
-                const y2 = targetPos.y * 5;
-
-                const isGlobal = link.type === 'global';
-
-                return (
-                  <line
-                    key={i}
-                    x1={x1} y1={y1} x2={x2} y2={y2}
-                    stroke={isGlobal ? "#933481" : "var(--color-secondary)"}
-                    strokeWidth={isGlobal ? 1 : 0.5}
-                    strokeOpacity={isGlobal ? 0.3 : 0.15}
-                    strokeDasharray={isGlobal ? "4 4" : "none"}
-                    className={isGlobal ? "animate-pulse" : ""}
-                  />
-                );
-              })}
-            </svg>
+            {/* Gossip Links Layer REMOVED */}
 
             {/* Nodes Layer */}
             <div className="absolute inset-0 m-4 pointer-events-none">
@@ -328,7 +258,7 @@ const FlatMap: React.FC<{
                   <div
                     key={node.pubkey}
                     className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-auto cursor-pointer group"
-                    style={{ left: `${x}% `, top: `${y}% ` }}
+                    style={{ left: `${x}%`, top: `${y}%` }}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (!hasDragged) {
@@ -338,7 +268,7 @@ const FlatMap: React.FC<{
                     onMouseEnter={() => setHoveredNode(node)}
                     onMouseLeave={() => setHoveredNode(null)}
                   >
-                    <div className={`relative transition - all duration - 300 ${isSelected ? 'scale-150 z-20' : 'hover:scale-150 hover:z-10'} `}>
+                    <div className={`relative transition-all duration-300 ${isSelected ? 'scale-150 z-20' : 'hover:scale-150 hover:z-10'}`}>
                       {(isSelected || hoveredNode === node) && (
                         <div className="absolute -inset-2 border border-white/40 rounded-full animate-ping"></div>
                       )}
@@ -352,10 +282,10 @@ const FlatMap: React.FC<{
                           <div
                             className="rounded-full shadow-lg"
                             style={{
-                              width: `${nodeSize * 4} px`,
-                              height: `${nodeSize * 4} px`,
+                              width: `${nodeSize * 4}px`,
+                              height: `${nodeSize * 4}px`,
                               backgroundColor: color,
-                              boxShadow: `0 0 ${nodeSize * 3}px ${color} `
+                              boxShadow: `0 0 ${nodeSize * 3}px ${color}`
                             }}
                           ></div>
                         );
@@ -371,16 +301,16 @@ const FlatMap: React.FC<{
               <div
                 className="absolute z-50 pointer-events-none"
                 style={{
-                  left: `${project(hoveredNode.lat || 0, hoveredNode.lon || 0).x}% `,
-                  top: `${project(hoveredNode.lat || 0, hoveredNode.lon || 0).y}% `,
-                  transform: `translate(-50 %, -150 %) scale(${1 / scale})`,
+                  left: `${project(hoveredNode.lat || 0, hoveredNode.lon || 0).x}%`,
+                  top: `${project(hoveredNode.lat || 0, hoveredNode.lon || 0).y}%`,
+                  transform: `translate(-50%, -150%) scale(${1 / scale})`,
                   transformOrigin: 'bottom center'
                 }}
               >
                 <div className="bg-elevated/95 backdrop-blur-md border border-border-strong p-3 rounded-xl text-left shadow-2xl min-w-[160px] animate-in fade-in zoom-in-95 duration-200">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-[10px] font-bold text-primary font-mono">NODE ID</span>
-                    <div className={`w - 1.5 h - 1.5 rounded - full`} style={{ backgroundColor: getNodeColor(hoveredNode.status) }}></div>
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getNodeColor(hoveredNode.status) }}></div>
                   </div>
                   <p className="text-xs font-bold text-text-primary mb-2 font-mono">{hoveredNode.pubkey.substring(0, 10)}...</p>
 
@@ -407,25 +337,28 @@ const FlatMap: React.FC<{
       {/* Zoom Controls */}
       <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex items-center gap-4 pointer-events-none">
         <div className="bg-elevated/50 backdrop-blur px-4 py-2 rounded-full border border-border-subtle text-xs font-mono text-text-secondary pointer-events-auto flex items-center gap-3">
-          <span className="mr-2 border-r border-border-subtle pr-3">2D MAP + GOSSIP</span>
+          <span className="mr-2 border-r border-border-subtle pr-3">NETWORK EXPLORER</span>
           <button onClick={handleZoomOut} className="hover:text-text-primary transition-colors"><Minus size={14} /></button>
           <span className="text-[10px] w-8 text-center text-text-primary">{(scale * 100).toFixed(0)}%</span>
           <button onClick={handleZoomIn} className="hover:text-text-primary transition-colors"><Plus size={14} /></button>
         </div>
       </div>
 
-      {/* Legend Override for Gossip */}
+      {/* Status Legend */}
       <div className="absolute bottom-6 left-6 z-10 pointer-events-none hidden md:block">
         <div className="bg-elevated/80 backdrop-blur-md border border-border-subtle rounded-lg p-3 shadow-lg">
           <div className="flex items-center gap-2 mb-2 text-[10px] text-text-muted uppercase font-bold">
-            <Share2 size={10} className="text-primary" /> Network Topology
+            Network Status
           </div>
           <div className="space-y-1">
-            <div className="flex items-center text-[10px] text-text-secondary">
-              <div className="w-4 h-0.5 bg-secondary/50 mr-2"></div> Local Peer
+            <div className="flex items-center text-[10px] text-text-secondary gap-2">
+              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getNodeColor('active') }}></div> Healthy
             </div>
-            <div className="flex items-center text-[10px] text-text-secondary">
-              <div className="w-4 h-0.5 border-t border-primary/50 border-dashed mr-2"></div> Bridge Link
+            <div className="flex items-center text-[10px] text-text-secondary gap-2">
+              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getNodeColor('delinquent') }}></div> Degraded
+            </div>
+            <div className="flex items-center text-[10px] text-text-secondary gap-2">
+              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getNodeColor('offline') }}></div> Offline
             </div>
           </div>
         </div>

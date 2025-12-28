@@ -21,6 +21,7 @@ interface NodeHybridCardProps {
     onToggleExpand: () => void;
     onCopyProp: (e: React.MouseEvent, text: string) => void;
     copiedId: string | null;
+    onNodeClick?: (node: PNode) => void;
 }
 
 export const NodeHybridCard: React.FC<NodeHybridCardProps> = ({
@@ -28,7 +29,8 @@ export const NodeHybridCard: React.FC<NodeHybridCardProps> = ({
     isExpanded,
     onToggleExpand,
     onCopyProp,
-    copiedId
+    copiedId,
+    onNodeClick
 }) => {
     // Helper: Health Score Calculation
     const getHealthScore = (n: PNode) => {
@@ -254,7 +256,10 @@ export const NodeHybridCard: React.FC<NodeHybridCardProps> = ({
                                 </div>
                             </div>
 
-                            <button className="mt-4 w-full py-2 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2">
+                            <button
+                                onClick={() => onNodeClick?.(node)}
+                                className="mt-4 w-full py-2 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2"
+                            >
                                 View Full Node Profile
                             </button>
                         </div>
