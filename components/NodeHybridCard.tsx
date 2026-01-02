@@ -12,8 +12,12 @@ import {
     Globe,
     Signal,
     Zap,
-    Copy
+    Copy,
+    Layers,
+    Coins,
+    Shield
 } from 'lucide-react';
+import { formatBytes } from '../utils/formatUtils';
 
 interface NodeHybridCardProps {
     node: PNode;
@@ -90,7 +94,6 @@ export const NodeHybridCard: React.FC<NodeHybridCardProps> = ({
                 onClick={onToggleExpand}
                 className="grid grid-cols-12 gap-4 p-4 items-center cursor-pointer"
             >
-
                 {/* A. Identity Block (Cols 1-4) */}
                 <div className="col-span-12 md:col-span-4 flex items-center gap-3">
                     <div className={`w-1.5 h-12 rounded-full flex-shrink-0 ${node.status === 'active' || node.status === 'online' ? 'bg-emerald-500' :
@@ -117,8 +120,13 @@ export const NodeHybridCard: React.FC<NodeHybridCardProps> = ({
                                 {node.city || 'Unknown'}, {node.country || 'Unknown'}
                             </span>
                             <span className="hidden sm:inline font-mono opacity-60">
-                                {node.ip || node.ip_address || 'N/A'}
+                                {node.address}
                             </span>
+                            {node.is_registered && (
+                                <span className="flex items-center gap-0.5 bg-emerald-500/10 text-emerald-500 px-1.5 py-0.5 rounded text-[9px] font-bold border border-emerald-500/20">
+                                    <Shield size={8} /> REG
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -161,7 +169,7 @@ export const NodeHybridCard: React.FC<NodeHybridCardProps> = ({
                             <HardDrive size={10} /> S
                         </div>
                         <span className="text-xs font-mono font-bold text-text-primary">
-                            {((node.storage_capacity ?? (node.total_storage_tb ?? 0) * 1e12) / 1e12).toFixed(1)}T
+                            {formatBytes(node.storage_capacity, 0)}
                         </span>
                     </div>
 
@@ -170,7 +178,7 @@ export const NodeHybridCard: React.FC<NodeHybridCardProps> = ({
                             <Cpu size={10} /> C
                         </div>
                         <span className="text-xs font-mono font-bold text-text-primary">
-                            {(node.cpu_percent ?? node.cpu_usage_percent ?? 0).toFixed(0)}%
+                            {(node.cpu_percent ?? 0).toFixed(0)}%
                         </span>
                     </div>
 
@@ -198,7 +206,6 @@ export const NodeHybridCard: React.FC<NodeHybridCardProps> = ({
             {isExpanded && (
                 <div className="px-4 pb-4 animate-in slide-in-from-top-2 duration-200">
                     <div className="pt-4 border-t border-border-subtle grid grid-cols-1 md:grid-cols-3 gap-6">
-
                         {/* Detailed Metrics */}
                         <div className="space-y-3">
                             <h4 className="text-xs font-bold text-text-secondary uppercase tracking-wider flex items-center gap-2">
@@ -208,7 +215,7 @@ export const NodeHybridCard: React.FC<NodeHybridCardProps> = ({
                                 <div className="flex justify-between items-center">
                                     <span className="text-text-muted">RAM Usage</span>
                                     <span className="font-mono text-text-primary">
-                                        {((node.ram_used ?? 0) / 1e9).toFixed(1)} / {((node.ram_total ?? 0) / 1e9).toFixed(1)} GB
+                                        {formatBytes(node.ram_used)} / {formatBytes(node.ram_total)}
                                     </span>
                                 </div>
                                 <div className="w-full h-1 bg-overlay-active rounded-full overflow-hidden">
@@ -218,7 +225,16 @@ export const NodeHybridCard: React.FC<NodeHybridCardProps> = ({
                                 <div className="flex justify-between items-center mt-2">
                                     <span className="text-text-muted">Response Time</span>
                                     <span className="font-mono text-text-primary">
-                                        {node.response_time ?? node.latency_ms ?? 0} ms
+                                        {node.response_time ?? 0} ms
+                                    </span>
+                                </div>
+
+                                <div className="flex justify-between items-center mt-2 pt-2 border-t border-border-subtle/30">
+                                    <span className="text-text-muted flex items-center gap-1">
+                                        <Coins size={12} className="text-primary" /> Total Credits
+                                    </span>
+                                    <span className="font-mono font-bold text-primary">
+                                        {(node.credits ?? 0).toLocaleString()} <span className="text-[10px] opacity-70">XAND</span>
                                     </span>
                                 </div>
                             </div>
@@ -233,13 +249,13 @@ export const NodeHybridCard: React.FC<NodeHybridCardProps> = ({
                                 <div className="bg-overlay-hover p-2 rounded col-span-2">
                                     <div className="text-text-muted text-[10px]">Region</div>
                                     <div className="font-semibold text-text-primary truncate">
-                                        {node.geo_info?.region ? `${node.geo_info.region}, ${node.geo_info.country}` : 'Unknown Region'}
+                                        {node.city ? `${node.city}, ${node.country}` : 'Unknown Region'}
                                     </div>
                                 </div>
                                 <div className="col-span-2 bg-overlay-hover p-2 rounded flex justify-between items-center">
-                                    <span className="text-text-muted text-[10px] font-mono">Full IP</span>
+                                    <span className="text-text-muted text-[10px] font-mono">Full Address</span>
                                     <span className="font-mono text-text-primary select-all">
-                                        {node.ip || node.ip_address || 'N/A'}
+                                        {node.address}
                                     </span>
                                 </div>
                             </div>
@@ -263,7 +279,6 @@ export const NodeHybridCard: React.FC<NodeHybridCardProps> = ({
                                 View Full Node Profile
                             </button>
                         </div>
-
                     </div>
                 </div>
             )}

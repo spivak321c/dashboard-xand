@@ -1,37 +1,35 @@
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { HardDrive, AlertTriangle } from 'lucide-react';
+import { formatBytes } from '../utils/formatUtils';
 
 interface StorageUsageChartProps {
-    totalStoragePB: number;
-    usedStoragePB: number;
+    totalBytes: number;
+    usedBytes: number;
 }
 
-export const StorageUsageChart: React.FC<StorageUsageChartProps> = ({ totalStoragePB, usedStoragePB }) => {
+export const StorageUsageChart: React.FC<StorageUsageChartProps> = ({ totalBytes, usedBytes }) => {
     // Helper function to format storage with smart unit scaling
-    const formatStorage = (pb: number) => {
-        const bytes = pb * 1e15; // Convert PB to bytes
-
-        if (bytes >= 1e15) return { value: (bytes / 1e15).toFixed(2), unit: 'PB' };
-        if (bytes >= 1e12) return { value: (bytes / 1e12).toFixed(2), unit: 'TB' };
-        if (bytes >= 1e9) return { value: (bytes / 1e9).toFixed(2), unit: 'GB' };
-        return { value: (bytes / 1e6).toFixed(2), unit: 'MB' };
+    const formatStorage = (bytes: number) => {
+        const formatted = formatBytes(bytes);
+        const [value, unit] = formatted.split(' ');
+        return { value, unit };
     };
 
-    const availablePB = totalStoragePB - usedStoragePB;
-    const usedPercent = totalStoragePB > 0 ? (usedStoragePB / totalStoragePB) * 100 : 0;
+    const availableBytes = totalBytes - usedBytes;
+    const usedPercent = totalBytes > 0 ? (usedBytes / totalBytes) * 100 : 0;
     const availablePercent = 100 - usedPercent;
 
-    const usedFormatted = formatStorage(usedStoragePB);
-    const availableFormatted = formatStorage(availablePB);
-    const totalFormatted = formatStorage(totalStoragePB);
+    const usedFormatted = formatStorage(usedBytes);
+    const availableFormatted = formatStorage(availableBytes);
+    const totalFormatted = formatStorage(totalBytes);
 
     // Warning state for high utilization
     const isHighUtilization = usedPercent > 80;
 
     const pieData = [
-        { name: 'Used', value: usedStoragePB, color: '#933481' }, // Primary brand color
-        { name: 'Available', value: availablePB, color: '#6E6E7E' } // Neutral gray
+        { name: 'Used', value: usedBytes, color: '#933481' }, // Primary brand color
+        { name: 'Available', value: availableBytes, color: '#6E6E7E' } // Neutral gray
     ];
 
     return (

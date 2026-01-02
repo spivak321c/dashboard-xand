@@ -86,6 +86,7 @@ export interface PNode {
     version: string;
     is_online: boolean;
     is_public: boolean;
+    is_registered: boolean;
     last_seen: string;
     first_seen: string;
     status: string;
@@ -108,7 +109,7 @@ export interface PNode {
     credits: number;
     credits_rank: number;
     credits_change: number;
-    all_ips?: string[];
+    all_ips?: string[]; // Frontend utility field
     total_stake: number;
     commission: number;
     apy: number;
@@ -118,20 +119,9 @@ export interface PNode {
     upgrade_severity: string;
     upgrade_message: string;
 
-    // Legacy fields handling for backward compatibility during migration
-    ip_address?: string; // Mapped to ip
-    gossip_port?: number;
-    rpc_port?: number; // Mapped to port
-    is_registered?: boolean; // Inferred from credits > 0
-    total_storage_tb?: number; // Deprecated
-    used_storage_tb?: number; // Deprecated
-    uptime_percent?: number; // Deprecated
-    cpu_usage_percent?: number; // Deprecated
-    ram_usage_percent?: number; // Deprecated
-    last_seen_ts?: number; // Deprecated
-    latency_ms?: number; // Deprecated
-    geo_info?: GeoInfo; // Deprecated
-    node_pubkey?: string; // Some views use this alias
+    // Legacy fields handling
+    ip_address?: string;
+    geo_info?: GeoInfo;
 }
 
 export interface PaginationMeta {
@@ -148,12 +138,15 @@ export interface NodesResponse {
     pagination: PaginationMeta;
 }
 
+export type SortOrder = 'asc' | 'desc';
+export type SortField = 'uptime' | 'performance' | 'credits' | 'storage' | 'latency';
+
 export interface NodesQueryParams {
     page?: number;
     limit?: number;
     status?: string;
-    sort?: string;
-    order?: 'asc' | 'desc';
+    sort?: SortField;
+    order?: SortOrder;
     include_offline?: boolean;
 }
 
@@ -175,18 +168,35 @@ export interface BackendStatus {
 
 export interface NetworkStats {
     total_nodes: number;
+    total_pods?: number;
     online_nodes: number;
     warning_nodes: number;
     offline_nodes: number;
-    public_nodes: number;
-    private_nodes: number;
-    total_storage_pb: number;
-    used_storage_pb: number;
+    total_public_nodes?: number;
+    total_private_nodes?: number;
+    online_public_nodes?: number;
+    online_private_nodes?: number;
+    public_nodes?: number; // legacy support
+    private_nodes?: number; // legacy support
+    total_storage_bytes?: number;
+    used_storage_bytes?: number;
+    average_storage_committed_per_pod_bytes?: number;
     average_uptime: number;
     average_performance: number;
     total_stake: number;
     network_health: number;
+    average_cpu_percent?: number;
+    average_ram_used_bytes?: number;
+    average_ram_total_bytes?: number;
+    average_uptime_seconds?: number;
+    total_packets_received?: number;
+    total_packets_sent?: number;
+    nodes_with_rpc_stats?: number;
     last_updated: string;
+
+    // Legacy mapping support
+    total_storage_pb?: number;
+    used_storage_pb?: number;
 }
 
 export type LatencyDistribution = Record<string, number>;

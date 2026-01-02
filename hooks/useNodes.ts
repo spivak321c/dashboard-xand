@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { PNode } from '../types/node.types';
 import { apiService } from '../services/api';
 import { AppSettings } from '../types';
-import { PaginationMeta } from '../types/api.types';
+import { PaginationMeta, SortField, SortOrder } from '../types/api.types';
 import { groupNodesByPubKey } from '../utils/nodeUtils';
 
 export function useNodes(settings?: AppSettings) {
@@ -13,16 +13,30 @@ export function useNodes(settings?: AppSettings) {
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
 
   const [page, setPage] = useState(1);
-  const [limit] = useState(20); // Default limit - 20 nodes per page
+  const [limit] = useState(50); // Default limit - 50 nodes per page
+
+  const [status, setStatus] = useState<string | undefined>(undefined);
+  const [sort, setSort] = useState<SortField | undefined>(undefined);
+  const [order, setOrder] = useState<SortOrder | undefined>(undefined);
+  const [includeOffline, setIncludeOffline] = useState<boolean>(true); // Default true based on requirements
 
   const fetchNodes = useCallback(async () => {
     try {
       setLoading(true);
 
-      // Fetch nodes from backend API with pagination support
-      const response = await apiService.getNodes({ page, limit });
+      // Fetch nodes from backend API with pagination and filtering support
+      const response = await apiService.getNodes({
+        page,
+        limit,
+        status,
+        sort,
+        order,
+        include_offline: includeOffline
+      });
 
       // Deduplicate nodes based on pubkey and group IPs
+      // Note: Grouping might hide some nodes if backend returns them separately, 
+      // but usually API returns unique nodes or we handle it here.
       const processedNodes = groupNodesByPubKey(response.nodes);
 
       setNodes(processedNodes);
@@ -37,7 +51,7 @@ export function useNodes(settings?: AppSettings) {
     } finally {
       setLoading(false);
     }
-  }, [page, limit]);
+  }, [page, limit, status, sort, order, includeOffline]);
 
   useEffect(() => {
     fetchNodes();
@@ -50,5 +64,19 @@ export function useNodes(settings?: AppSettings) {
     };
   }, [fetchNodes, settings?.autoRefresh, settings?.refreshInterval]);
 
-  return { nodes, loading, error, refetch: fetchNodes, lastUpdated, pagination, setPage, page };
+  return {
+    nodes,
+    loading,
+    error,
+    refetch: fetchNodes,
+    lastUpdated,
+    pagination,
+    setPage,
+    page,
+    // Filter controls
+    setStatus,
+    setSort,
+    setOrder,
+    setIncludeOffline
+  };
 }

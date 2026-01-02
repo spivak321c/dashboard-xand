@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNodes } from '../hooks/useNodes';
 import { apiService } from '../services/api';
+import { NetworkStats } from '../types/api.types';
 import { EarthView } from './EarthView';
 import { NodeDetailPanel } from './NodeDetailPanel';
 import { NodeDetailView } from './NodeDetailView'; // Import the new View
@@ -25,7 +26,7 @@ function App() {
   const [settings, setSettings] = useState<AppSettings>({
     rpcEndpoint: 'https://api.xandeum.network',
     autoRefresh: true,
-    refreshInterval: 30000,
+    refreshInterval: 7000,
     show3DOnMobile: false,
     theme: 'light', // Default theme
     network: 'mainnet' // Default network
@@ -43,20 +44,41 @@ function App() {
   }, [settings.theme]);
 
   // Data Fetching - Paginated for list view
-  const { nodes, loading, error, refetch, lastUpdated, pagination, setPage, page } = useNodes(settings);
+  const {
+    nodes,
+    loading,
+    error,
+    refetch,
+    lastUpdated,
+    pagination,
+    setPage,
+    page,
+    setStatus,
+    setSort,
+    setOrder,
+    setIncludeOffline
+  } = useNodes(settings);
+  // ...
+
 
   // Fetch ALL nodes for Dashboard and EarthView (not paginated)
   const [allNodes, setAllNodes] = React.useState<PNode[]>([]);
+  const [stats, setStats] = React.useState<NetworkStats | null>(null);
   const [allNodesLoading, setAllNodesLoading] = React.useState(true);
 
   const fetchAllNodes = React.useCallback(async () => {
     try {
       setAllNodesLoading(true);
-      const response = await apiService.getNodes({ page: 1, limit: 1000 }); // Fetch all nodes
-      const processedNodes = groupNodesByPubKey(response.nodes);
+      const [nodesResponse, statsResponse] = await Promise.all([
+        apiService.getNodes({ page: 1, limit: 1000 }),
+        apiService.getStats()
+      ]);
+
+      const processedNodes = groupNodesByPubKey(nodesResponse.nodes);
       setAllNodes(processedNodes);
+      setStats(statsResponse);
     } catch (err) {
-      console.error('Error fetching all nodes:', err);
+      console.error('Error fetching data:', err);
     } finally {
       setAllNodesLoading(false);
     }
@@ -77,6 +99,7 @@ function App() {
   const [selectedNode, setSelectedNode] = useState<PNode | null>(null);
   const [currentView, setCurrentView] = useState<ViewMode>(ViewMode.DASHBOARD);
   const [isRefetching, setIsRefetching] = useState(false);
+  const [playgroundEndpoint, setPlaygroundEndpoint] = useState<string | undefined>(undefined);
 
   // Handle Manual Refresh with animation state
   const handleRefresh = async () => {
@@ -145,7 +168,17 @@ function App() {
         // Actually, for 3D view specifically, the original code returned the <EarthView> with a <NodeDetailPanel>.
         // So we don't return NodeDetailView here if 3D.
       } else {
-        return <NodeDetailView node={selectedNode} onBack={() => setSelectedNode(null)} />;
+        return (
+          <NodeDetailView
+            node={selectedNode}
+            onBack={() => setSelectedNode(null)}
+            onConnectRPC={(endpoint: string) => {
+              setPlaygroundEndpoint(endpoint);
+              setCurrentView(ViewMode.PLAYGROUND);
+              setSelectedNode(null);
+            }}
+          />
+        );
       }
     }
 
@@ -157,7 +190,12 @@ function App() {
       <div className="w-full h-full relative">
         {/* DASHBOARD */}
         <div style={{ display: currentView === ViewMode.DASHBOARD && !selectedNode ? 'block' : 'none', height: '100%' }}>
-          <Dashboard nodes={allNodes} onNodeClick={handleNodeClick} onNavigateToNodes={() => setCurrentView(ViewMode.NODES_LIST)} />
+          <Dashboard
+            nodes={allNodes}
+            onNodeClick={handleNodeClick}
+            onNavigateToNodes={() => setCurrentView(ViewMode.NODES_LIST)}
+            autoRefresh={settings.autoRefresh}
+          />
         </div>
 
         {/* NODES LIST */}
@@ -168,6 +206,10 @@ function App() {
             pagination={pagination}
             currentPage={page}
             onPageChange={setPage}
+            onStatusChange={setStatus}
+            onSortChange={setSort}
+            onOrderChange={setOrder}
+            onIncludeOfflineChange={setIncludeOffline}
           />
         </div>
 
@@ -184,6 +226,7 @@ function App() {
             <div className="w-full h-full relative">
               <EarthView
                 nodes={allNodes}
+                stats={stats}
                 onNodeClick={handleNodeClick}
                 selectedNodeId={selectedNode?.pubkey}
                 lastUpdated={lastUpdated}
@@ -206,7 +249,7 @@ function App() {
         */}
 
         <div style={{ display: currentView === ViewMode.PLAYGROUND && !selectedNode ? 'block' : 'none', height: '100%' }}>
-          <PlaygroundView />
+          <PlaygroundView initialEndpoint={playgroundEndpoint} />
         </div>
 
         <div style={{ display: currentView === ViewMode.HISTORICAL_ANALYSIS && !selectedNode ? 'block' : 'none', height: '100%' }}>

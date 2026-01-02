@@ -1,0 +1,687 @@
+// import React, { useEffect, useState, useCallback } from 'react';
+// import { PNode } from '../types/node.types';
+// import { NetworkStats, LatencyDistribution } from '../types/api.types';
+// import { apiService } from '../services/api';
+// import { useDashboardMetrics } from '../hooks/useDashboardMetrics';
+// import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, AreaChart, Area, ReferenceLine } from 'recharts';
+// import { Server, Activity, Globe, Wifi, Zap, Cpu, TrendingUp, AlertTriangle, CheckCircle, RefreshCw, LayoutDashboard, Eye, EyeOff, HardDrive, ChevronUp, ChevronDown, Loader2, Layers, Lock, Clock } from 'lucide-react';
+// import { StorageUsageChart } from './StorageUsageChart';
+// import { formatBytes } from '../utils/formatUtils';
+
+// interface DashboardProps {
+//   nodes: PNode[];
+//   onNodeClick?: (node: PNode) => void;
+//   onNavigateToNodes?: () => void;
+// }
+
+// interface StatCardProps {
+//   label: string;
+//   value: string | number;
+//   subtext?: string;
+//   icon: React.ComponentType<{ size?: number; className?: string }>;
+//   trend?: number;
+//   trendColor?: string;
+// }
+
+// const StatCard = ({ label, value, subtext, icon: Icon, trend, trendColor }: StatCardProps) => (
+//   <div className="bg-surface border border-border-subtle rounded-xl p-4 relative overflow-hidden shadow-lg min-h-[140px] flex flex-col justify-between group hover:border-primary/40 transition-all duration-300">
+//     {/* Decorative blur */}
+//     <div className="absolute -top-10 -right-10 w-24 h-24 bg-primary-soft rounded-full blur-2xl opacity-50 group-hover:opacity-80 transition-opacity"></div>
+
+//     <div className="relative z-10 flex flex-col h-full">
+//       <div className="flex justify-between items-start mb-2">
+//         <div className="p-2 bg-overlay-hover rounded-lg text-text-primary border border-overlay-active">
+//           <Icon size={18} />
+//         </div>
+//         {trend && (
+//           <div className={`text-[10px] font-mono font-bold ${trendColor || 'text-secondary'} flex items-center bg-overlay-hover px-1.5 py-0.5 rounded`}>
+//             <Zap size={8} className="mr-1" />
+//             {trend > 0 ? '+' : ''}{trend}%
+//           </div>
+//         )}
+//       </div>
+
+//       <div>
+//         <p className="text-text-secondary text-[10px] font-bold uppercase tracking-wider mb-1 truncate">{label}</p>
+//         <div className="flex items-baseline gap-1">
+//           <h3 className="text-2xl font-black text-text-primary font-mono tracking-tight">{value}</h3>
+//         </div>
+//         {subtext && (
+//           <div className="text-text-muted text-[9px] mt-1 font-medium truncate opacity-80">
+//             {subtext}
+//           </div>
+//         )}
+//       </div>
+//     </div>
+//   </div>
+// );
+
+// interface NetworkHealthStatCardProps {
+//   score: number;
+// }
+
+// const NetworkHealthCard: React.FC<NetworkHealthStatCardProps> = ({ score }) => {
+//   const getHealthColor = (s: number) => {
+//     if (s >= 80) return 'text-emerald-500';
+//     if (s >= 50) return 'text-amber-500';
+//     return 'text-red-500';
+//   };
+
+//   const getHealthBg = (s: number) => {
+//     if (s >= 80) return 'bg-emerald-500/10';
+//     if (s >= 50) return 'bg-amber-500/10';
+//     return 'bg-red-500/10';
+//   };
+
+//   return (
+//     <div className={`p-4 rounded-xl border flex items-center gap-4 transition-all shadow-lg hover:border-primary/40 min-h-[140px] bg-surface border-border-subtle group relative overflow-hidden`}>
+//       <div className="absolute -top-10 -right-10 w-24 h-24 bg-primary-soft rounded-full blur-2xl opacity-50 group-hover:opacity-80 transition-opacity"></div>
+//       <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 z-10 ${getHealthBg(score)} ${getHealthColor(score)}`}>
+//         <Activity size={20} />
+//       </div>
+//       <div className="min-w-0 z-10">
+//         <div className="text-[10px] text-text-muted uppercase tracking-wider font-bold mb-0.5 truncate">Net Health</div>
+//         <div className={`text-lg font-bold leading-tight ${getHealthColor(score)}`}>{score.toFixed(1)}%</div>
+//         <div className="text-[10px] text-text-muted truncate mt-0.5">Overall System</div>
+//       </div>
+//     </div>
+//   );
+// };
+
+// // New Component: Storage Capacity Forecast
+// const StorageForecast = ({ totalStorageBytes, usedStorageBytes }: { totalStorageBytes: number, usedStorageBytes: number }) => {
+//   const utilization = totalStorageBytes > 0 ? (usedStorageBytes / totalStorageBytes) * 100 : 0;
+
+//   // Simulation: Daily growth 0.5% of total or min 5TB (approx 5e12 bytes)
+//   const dailyGrowthBytes = Math.max(5 * 1024 * 1024 * 1024 * 1024, totalStorageBytes * 0.005);
+//   const daysToFull = dailyGrowthBytes > 0 ? (totalStorageBytes - usedStorageBytes) / dailyGrowthBytes : 999;
+
+//   // Status Logic
+//   const needsNodes = utilization > 75 || daysToFull < 60;
+
+//   // Calculate recommended nodes (assuming ~50TB per node average)
+//   const avgNodeStorageBytes = 50 * 1024 * 1024 * 1024 * 1024;
+//   const storageNeededBytes = dailyGrowthBytes * 30; // 30 days worth
+//   const recommendedNodes = Math.ceil(storageNeededBytes / avgNodeStorageBytes);
+
+//   // Milestone: Next Petabyte or next 1000TB (1PB = 1e15 bytes)
+//   const currentPB = Math.floor(usedStorageBytes / 1e15);
+//   const nextMilestoneBytes = (currentPB + 1) * 1e15;
+//   const daysToMilestone = dailyGrowthBytes > 0 ? (nextMilestoneBytes - usedStorageBytes) / dailyGrowthBytes : 0;
+
+//   // Chart Data
+//   const data = Array.from({ length: 30 }, (_, i) => ({
+//     name: `Day ${i + 1}`,
+//     used: usedStorageBytes + (dailyGrowthBytes * i),
+//     capacity: totalStorageBytes
+//   }));
+
+//   return (
+//     <div className="bg-surface border border-border-subtle rounded-2xl p-5 flex flex-col md:flex-row gap-5 lg:col-span-3 shadow-lg relative overflow-hidden group">
+//       {/* Decorative background similar to StatCard */}
+//       <div className="absolute top-0 right-0 w-64 h-64 bg-primary-soft rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 opacity-20 pointer-events-none group-hover:opacity-30 transition-opacity"></div>
+
+//       <div className="flex-1 space-y-4 relative z-10">
+//         <div>
+//           <h3 className="text-lg font-bold text-text-primary flex items-center">
+//             <TrendingUp className="w-5 h-5 mr-2 text-primary" />
+//             Storage Capacity Forecast
+//           </h3>
+//           <p className="text-sm text-text-muted mt-1">Predictive analysis of network growth and storage demand.</p>
+//         </div>
+
+//         <div className={`p-4 rounded-xl border flex items-start gap-3 ${needsNodes ? 'bg-accent/10 border-accent/20' : 'bg-secondary/10 border-secondary/20'}`}>
+//           {needsNodes ? <AlertTriangle className="text-accent shrink-0 mt-0.5" /> : <CheckCircle className="text-secondary shrink-0 mt-0.5" />}
+//           <div>
+//             <h4 className={`text-sm font-bold ${needsNodes ? 'text-accent' : 'text-secondary'}`}>
+//               {needsNodes ? 'New pNodes Recommended' : 'Capacity Levels Optimal'}
+//             </h4>
+//             <p className="text-xs text-text-primary mt-1 leading-relaxed">
+//               {needsNodes ? (
+//                 <>
+//                   Deploy <span className="font-bold text-accent">~{recommendedNodes} new pNodes</span> in next 30 days to maintain capacity buffer.
+//                   Current growth: <span className="font-mono">{formatBytes(dailyGrowthBytes)}/day</span>.
+//                 </>
+//               ) : (
+//                 <>
+//                   At current growth rate (<span className="font-mono">{formatBytes(dailyGrowthBytes)}/day</span>),
+//                   usage reaches <span className="font-bold">{formatBytes(nextMilestoneBytes)}</span> in <span className="font-mono font-bold">{daysToMilestone.toFixed(0)} days</span>.
+//                 </>
+//               )}
+//             </p>
+//           </div>
+//         </div>
+
+//         <div className="grid grid-cols-2 gap-4">
+//           <div className="bg-root p-3 rounded-lg border border-border-subtle">
+//             <div className="text-[10px] text-text-muted uppercase tracking-wider mb-1">Utilization</div>
+//             <div className="text-2xl font-bold text-text-primary font-mono">{utilization.toFixed(1)}%</div>
+//             <div className="w-full h-1.5 bg-border-strong rounded-full mt-2 overflow-hidden">
+//               <div className={`h-full ${utilization > 80 ? 'bg-accent' : 'bg-secondary'}`} style={{ width: `${utilization}%` }}></div>
+//             </div>
+//           </div>
+//           <div className="bg-root p-3 rounded-lg border border-border-subtle">
+//             <div className="text-[10px] text-text-muted uppercase tracking-wider mb-1">Days to Saturation</div>
+//             <div className="text-2xl font-bold text-text-primary font-mono">{daysToFull < 999 ? daysToFull.toFixed(0) : '>999'}</div>
+//             <div className="text-[10px] text-text-muted mt-1">Based on linear projection</div>
+//           </div>
+//         </div>
+
+
+//       </div>
+
+//       <div className="flex-1 min-h-[180px] bg-root rounded-xl border border-border-subtle p-4 relative z-10">
+//         <div className="flex justify-between items-center mb-3">
+//           <span className="text-xs font-bold text-text-secondary uppercase">30-Day Projection</span>
+//           <div className="flex items-center gap-2 text-[10px]">
+//             <span className="flex items-center text-primary"><span className="w-2 h-2 rounded-full bg-primary mr-1"></span> Used</span>
+//             <span className="flex items-center text-text-muted"><span className="w-2 h-2 rounded-full bg-text-muted mr-1"></span> Cap</span>
+//           </div>
+//         </div>
+//         <ResponsiveContainer width="100%" height={140}>
+//           <AreaChart data={data}>
+//             <defs>
+//               <linearGradient id="colorUsed" x1="0" y1="0" x2="0" y2="1">
+//                 <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.3} />
+//                 <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0} />
+//               </linearGradient>
+//             </defs>
+//             <Tooltip
+//               contentStyle={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-strong)', color: 'var(--text-primary)', fontSize: '12px' }}
+//               labelStyle={{ display: 'none' }}
+//               formatter={(value: number) => [formatBytes(value), '']}
+//             />
+//             <ReferenceLine y={totalStorageBytes} stroke="var(--text-muted)" strokeDasharray="3 3" />
+//             <Area type="monotone" dataKey="used" stroke="var(--color-primary)" fill="url(#colorUsed)" strokeWidth={2} />
+//           </AreaChart>
+//         </ResponsiveContainer>
+//       </div>
+//     </div>
+//   );
+// };
+
+
+
+// export const Dashboard: React.FC<DashboardProps> = ({ nodes, onNodeClick, onNavigateToNodes }) => {
+//   const [stats, setStats] = useState<NetworkStats | null>(null);
+//   const [latencyDist, setLatencyDist] = useState<LatencyDistribution | null>(null);
+//   const [sortMetric, setSortMetric] = useState<'rank' | 'latency' | 'score' | 'credit'>('rank');
+
+//   // New analytics metrics
+//   const { metrics, loading: metricsLoading, refresh: refreshMetrics } = useDashboardMetrics();
+//   const [isRefreshing, setIsRefreshing] = useState(false);
+//   const [showLatencyChart, setShowLatencyChart] = useState(false);
+
+//   // Shared fetcher that returns data instead of setting state directly
+//   const loadStatsData = useCallback(async () => {
+//     return Promise.all([
+//       apiService.getStats(),
+//       apiService.getLatencyDistribution()
+//     ]);
+//   }, []);
+
+//   const handleManualRefresh = async () => {
+//     setIsRefreshing(true);
+//     try {
+//       const [statsData, latencyData] = await loadStatsData();
+//       setStats(statsData);
+//       setLatencyDist(latencyData);
+//       await refreshMetrics();
+//     } catch (error) {
+//       console.error("Refresh failed:", error);
+//     }
+//     setTimeout(() => setIsRefreshing(false), 800);
+//   };
+
+//   useEffect(() => {
+//     let ignore = false;
+
+//     const init = async () => {
+//       try {
+//         const [statsData, latencyData] = await loadStatsData();
+//         if (!ignore) {
+//           setStats(statsData);
+//           setLatencyDist(latencyData);
+//         }
+//       } catch (error) {
+//         console.error("Failed to fetch dashboard stats", error);
+//       }
+//     };
+
+//     init();
+//     return () => { ignore = true; };
+//   }, [loadStatsData]);
+
+//   // Use props nodes as fallback or for side calculations
+//   const regionData = nodes.reduce((acc: Record<string, number>, node) => {
+//     // Try to get country from new API structure or fallback to geo_info
+//     const region = node.country || node.geo_info?.region || 'Unknown';
+//     acc[region] = (acc[region] || 0) + 1;
+//     return acc;
+//   }, {});
+//   const pieData = Object.keys(regionData).map(key => ({ name: key, value: regionData[key] }));
+
+//   const COLORS = ['#933481', '#008E7C', '#FE8300', '#D1D1D6', '#6E6E7E'];
+
+//   // Convert API latency distribution to Chart format
+//   // Order keys numerically logic
+//   const latencyDistribution = latencyDist ? Object.entries(latencyDist).map(([range, count]) => ({
+//     range,
+//     count
+//   })).sort((a, b) => {
+//     // Custom sort to handle "0-50ms", "100-250ms" etc.
+//     // Extract first number
+//     const getNum = (str: string) => parseInt(str.match(/\d+/)?.[0] || '0');
+//     return getNum(a.range) - getNum(b.range);
+//   }) : [];
+
+//   // Derived values for display (prefer API stats, fallback to calculation if needed)
+//   const activeNodesCount = stats?.online_nodes ?? nodes.filter(n => n.status === 'active' || n.status === 'online').length;
+
+//   // Storage display values
+//   const totalStorageFormatted = stats?.total_storage_bytes
+//     ? formatBytes(stats.total_storage_bytes)
+//     : formatBytes(nodes.reduce((acc, n) => acc + (n.storage_capacity ?? 0), 0));
+
+//   const usedStorageFormatted = stats?.used_storage_bytes
+//     ? formatBytes(stats.used_storage_bytes)
+//     : formatBytes(nodes.reduce((acc, n) => acc + (n.storage_used ?? 0), 0));
+
+//   const totalStorageBytes = stats?.total_storage_bytes ?? (stats?.total_storage_pb ? stats.total_storage_pb * 1e15 : 0);
+//   const usedStorageBytes = stats?.used_storage_bytes ?? (stats?.used_storage_pb ? stats.used_storage_pb * 1e15 : 0);
+
+//   const avgPerformance = stats?.average_performance ?? 0;
+//   const networkHealth = stats?.network_health ?? 0;
+
+//   // Safe storage values for per-node display
+//   const getStorageCapacity = (n: PNode) => (n.storage_capacity ?? 0);
+//   const getStorageUsed = (n: PNode) => (n.storage_used ?? 0);
+
+//   return (
+//     <div className="p-6 md:p-8 space-y-6 animate-in fade-in duration-500 pb-20 bg-root">
+
+//       {/* Dashboard Header */}
+//       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
+//         <div>
+//           <h2 className="text-xl font-bold text-text-primary flex items-center">
+//             <LayoutDashboard className="mr-3 text-primary" />
+//             Network Dashboard
+//           </h2>
+//           <div className="flex items-center gap-2 mt-1">
+//             <p className="text-sm text-text-muted">Real-time overview of network health and performance.</p>
+//             {stats?.last_updated && (
+//               <span className="text-[10px] bg-secondary/10 text-secondary px-2 py-0.5 rounded-full flex items-center border border-secondary/20">
+//                 <Clock size={10} className="mr-1" />
+//                 Updated: {new Date(stats.last_updated).toLocaleTimeString()}
+//               </span>
+//             )}
+//           </div>
+//         </div>
+
+//         <div className="flex items-center gap-3">
+//           <button
+//             onClick={handleManualRefresh}
+//             disabled={isRefreshing || metricsLoading}
+//             className="flex items-center px-4 py-2 bg-surface border border-border-subtle rounded-lg text-sm font-medium text-text-primary hover:bg-overlay-hover hover:border-primary/30 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed group"
+//           >
+//             <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin text-primary' : 'text-text-muted group-hover:text-primary transition-colors'}`} />
+//             {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
+//           </button>
+
+//           <button
+//             onClick={() => setShowLatencyChart(!showLatencyChart)}
+//             className="flex items-center px-4 py-2 bg-surface border border-border-subtle rounded-lg text-sm font-medium text-text-primary hover:bg-overlay-hover hover:border-primary/30 transition-all shadow-sm group"
+//             title={showLatencyChart ? 'Hide Latency Chart' : 'Show Latency Chart'}
+//           >
+//             {showLatencyChart ? <EyeOff className="w-4 h-4 mr-2 text-text-muted group-hover:text-primary transition-colors" /> : <Eye className="w-4 h-4 mr-2 text-text-muted group-hover:text-primary transition-colors" />}
+//             Latency Chart
+//           </button>
+//         </div>
+//       </div>
+
+//       {/* Stats - Row 1: Network Vitality */}
+//       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-6">
+//         <StatCard
+//           label="Total Nodes"
+//           value={stats?.total_nodes ?? nodes.length}
+//           icon={Server}
+//         />
+//         <StatCard
+//           label="Total Pubkeys"
+//           value={stats?.total_pods ?? '-'}
+//           icon={Layers}
+//         />
+//         <StatCard
+//           label="Public Nodes"
+//           value={stats?.public_nodes ?? '-'}
+//           icon={Globe}
+//           subtext="Discoverable"
+//         />
+//         <StatCard
+//           label="Private Nodes"
+//           value={stats?.private_nodes ?? '-'}
+//           icon={Lock}
+//           subtext="Internal Only"
+//         />
+//         <StatCard
+//           label="Online"
+//           value={activeNodesCount}
+//           subtext={`${stats?.total_nodes ? ((activeNodesCount / stats.total_nodes) * 100).toFixed(1) : 0}% Up`}
+//           icon={Wifi}
+//           trendColor="text-emerald-500"
+//         />
+//         {stats?.warning_nodes && stats.warning_nodes > 0 ? (
+//           <StatCard
+//             label="Warning"
+//             value={stats.warning_nodes}
+//             icon={AlertTriangle}
+//             trendColor="text-amber-500"
+//           />
+//         ) : (
+//           <StatCard
+//             label="Offline"
+//             value={stats?.offline_nodes ?? (nodes.length - activeNodesCount)}
+//             icon={EyeOff}
+//             trendColor="text-red-500"
+//           />
+//         )}
+//       </div>
+
+//       {/* Stats - Row 2: Performance & Capacity */}
+//       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
+//         <StatCard
+//           label="Capacity"
+//           value={totalStorageFormatted}
+//           subtext={`${usedStorageFormatted} used`}
+//           icon={HardDrive}
+//         />
+//         <StatCard
+//           label="Avg Pod Storage"
+//           value={stats?.average_storage_committed_per_pod_bytes ? formatBytes(stats.average_storage_committed_per_pod_bytes) : '-'}
+//           icon={HardDrive}
+//         />
+//         <StatCard
+//           label="Avg Performance"
+//           value={stats?.average_performance?.toFixed(1) ?? '-'}
+//           subtext="Response Consistency"
+//           icon={Activity}
+//         />
+//         <StatCard
+//           label="Geo Presence"
+//           value={pieData.length}
+//           subtext="Active Regions"
+//           icon={Globe}
+//         />
+//         <NetworkHealthCard score={networkHealth} />
+//       </div>
+
+//       {/* Storage Forecast Row */}
+//       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+//         <StorageForecast totalStorageBytes={totalStorageBytes} usedStorageBytes={usedStorageBytes} />
+//       </div>
+
+//       {/* Main Visuals Row */}
+//       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:h-[400px]">
+//         {/* Latency Chart - Optional */}
+//         {showLatencyChart && (
+//           <div className="lg:col-span-2 bg-surface border border-border-subtle rounded-2xl p-6 flex flex-col h-[300px] lg:h-auto">
+//             <div className="flex justify-between items-center mb-6">
+//               <h3 className="text-lg font-bold text-text-primary flex items-center">
+//                 <Wifi className="w-5 h-5 mr-2 text-primary" />
+//                 Latency Distribution
+//               </h3>
+//               <div className="flex items-center gap-2">
+//                 <div className="bg-overlay-hover rounded-lg p-1 flex text-xs">
+//                   <button className="px-3 py-1 bg-surface shadow-sm rounded-md text-text-primary font-medium border border-border-subtle">Log</button>
+//                   <button className="px-3 py-1 text-text-muted">Linear</button>
+//                 </div>
+//                 <button
+//                   onClick={() => setShowLatencyChart(!showLatencyChart)}
+//                   className="p-2 hover:bg-overlay-hover rounded-lg transition-colors text-text-muted hover:text-text-primary"
+//                   title={showLatencyChart ? "Hide chart" : "Show chart"}
+//                 >
+//                   {showLatencyChart ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+//                 </button>
+//               </div>
+//             </div>
+//             {showLatencyChart && (
+//               <div className="flex-1 w-full min-h-0">
+//                 {latencyDist ? (
+//                   <ResponsiveContainer width="100%" height="100%">
+//                     <BarChart data={latencyDistribution} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+//                       <XAxis
+//                         dataKey="range"
+//                         stroke="#A6A6B2"
+//                         fontSize={12}
+//                         tickLine={false}
+//                         axisLine={false}
+//                         dy={10}
+//                       />
+//                       <YAxis
+//                         stroke="#A6A6B2"
+//                         fontSize={12}
+//                         tickLine={false}
+//                         axisLine={false}
+//                       />
+//                       <Tooltip
+//                         cursor={{ fill: 'var(--overlay-hover)' }}
+//                         contentStyle={{
+//                           backgroundColor: 'var(--bg-elevated)',
+//                           borderColor: 'var(--border-strong)',
+//                           color: 'var(--text-primary)',
+//                           borderRadius: '8px',
+//                           boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+//                         }}
+//                       />
+//                       <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+//                         {latencyDistribution.map((entry, index) => (
+//                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+//                         ))}
+//                       </Bar>
+//                     </BarChart>
+//                   </ResponsiveContainer>
+//                 ) : (
+//                   <div className="flex items-center justify-center h-full text-text-muted">
+//                     <Loader2 className="w-8 h-8 animate-spin mr-2" /> Loading distribution...
+//                   </div>
+//                 )}
+//               </div>
+//             )}
+//             {!showLatencyChart && (
+//               <div className="flex-1 flex items-center justify-center text-text-muted text-sm">
+//                 Click the arrow to view latency distribution
+//               </div>
+//             )}
+//           </div>
+//         )}
+
+//         {/* Storage Usage Chart */}
+//         <div className={`${showLatencyChart ? 'lg:col-span-1' : 'lg:col-span-3'} min-h-[300px] lg:min-h-0`}>
+//           <StorageUsageChart
+//             totalBytes={totalStorageBytes}
+//             usedBytes={usedStorageBytes}
+//           />
+//         </div>
+//       </div>
+
+
+//       {/* Bottom Section */}
+//       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+//         {/* Regional Distribution */}
+//         <div className="bg-surface border border-border-subtle rounded-2xl p-6 lg:col-span-1">
+//           <h3 className="text-lg font-bold text-text-primary mb-6 flex items-center">
+//             <Globe className="w-5 h-5 mr-2 text-primary" />
+//             Geo-Presence
+//           </h3>
+//           <div className="h-48 w-full flex items-center justify-center relative">
+//             <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
+//               <span className="text-2xl font-bold text-text-primary">{stats?.total_nodes ?? nodes.length}</span>
+//               <span className="text-[10px] text-text-muted uppercase tracking-widest">Total Nodes</span>
+//             </div>
+
+//             <ResponsiveContainer width="100%" height="100%">
+//               <PieChart>
+//                 <Pie
+//                   data={pieData}
+//                   cx="50%"
+//                   cy="50%"
+//                   innerRadius={60}
+//                   outerRadius={80}
+//                   paddingAngle={4}
+//                   dataKey="value"
+//                   stroke="none"
+//                 >
+//                   {pieData.map((entry, index) => (
+//                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+//                   ))}
+//                 </Pie>
+//                 <Tooltip
+//                   contentStyle={{
+//                     backgroundColor: 'var(--bg-elevated)',
+//                     borderColor: 'var(--border-strong)',
+//                     color: 'var(--text-primary)',
+//                     borderRadius: '8px'
+//                   }}
+//                 />
+//               </PieChart>
+//             </ResponsiveContainer>
+//           </div>
+//           <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 mt-4 px-2">
+//             {pieData.map((entry, index) => (
+//               <div key={entry.name} className="flex items-center text-[10px]">
+//                 <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+//                 <span className="text-text-secondary font-medium">{entry.name}</span>
+//               </div>
+//             ))}
+//           </div>
+//         </div>
+
+//         {/* Top Nodes Table */}
+//         <div className="bg-surface border border-border-subtle rounded-2xl overflow-hidden lg:col-span-2 flex flex-col">
+//           <div className="px-6 py-5 border-b border-border-subtle flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-overlay-hover">
+//             <div className="flex items-center gap-4">
+//               <h3 className="text-lg font-bold text-text-primary flex items-center">
+//                 <Layers className="w-5 h-5 mr-2 text-primary" />
+//                 Top Performers
+//               </h3>
+//               <div className="flex bg-root rounded-lg p-0.5 border border-border-subtle">
+//                 <button
+//                   onClick={() => setSortMetric('credit')}
+//                   className={`px-3 py-1 text-[10px] font-bold uppercase rounded-md transition-all ${sortMetric === 'credit' ? 'bg-surface text-primary shadow-sm' : 'text-text-muted hover:text-text-primary'}`}
+//                 >
+//                   Credit
+//                 </button>
+//                 <button
+//                   onClick={() => setSortMetric('latency')}
+//                   className={`px-3 py-1 text-[10px] font-bold uppercase rounded-md transition-all ${sortMetric === 'latency' ? 'bg-surface text-primary shadow-sm' : 'text-text-muted hover:text-text-primary'}`}
+//                 >
+//                   Latency
+//                 </button>
+//                 <button
+//                   onClick={() => setSortMetric('score')}
+//                   className={`px-3 py-1 text-[10px] font-bold uppercase rounded-md transition-all ${sortMetric === 'score' ? 'bg-surface text-primary shadow-sm' : 'text-text-muted hover:text-text-primary'}`}
+//                 >
+//                   Score
+//                 </button>
+//               </div>
+//             </div>
+//             <button
+//               onClick={onNavigateToNodes}
+//               className="text-xs font-medium text-primary hover:underline cursor-pointer"
+//             >
+//               Full Registry &rarr;
+//             </button>
+//           </div>
+//           <div className="overflow-x-auto flex-1">
+//             <table className="w-full text-left text-sm text-text-secondary">
+//               <thead className="bg-overlay-hover text-text-muted uppercase tracking-wider text-[10px] font-bold">
+//                 <tr>
+//                   <th className="px-6 py-3 text-center">{sortMetric === 'credit' ? 'Credits' : 'Rank'}</th>
+//                   <th className="px-6 py-3">Node Identity</th>
+//                   <th className="px-6 py-3">Storage</th>
+//                   <th className="px-6 py-3">Performance</th>
+//                   <th className="px-6 py-3 text-right">Latency</th>
+//                 </tr>
+//               </thead>
+//               <tbody className="divide-y divide-border-subtle font-mono text-xs">
+//                 {[...nodes]
+//                   .sort((a, b) => {
+//                     if (sortMetric === 'rank') {
+//                       return (a.credits_rank ?? Number.MAX_SAFE_INTEGER) - (b.credits_rank ?? Number.MAX_SAFE_INTEGER);
+//                     } else if (sortMetric === 'credit') {
+//                       return (b.credits ?? 0) - (a.credits ?? 0);
+//                     } else if (sortMetric === 'latency') {
+//                       return (a.response_time ?? Number.MAX_SAFE_INTEGER) - (b.response_time ?? Number.MAX_SAFE_INTEGER);
+//                     } else {
+//                       return (b.performance_score ?? b.uptime_score ?? 0) - (a.performance_score ?? a.uptime_score ?? 0);
+//                     }
+//                   })
+//                   .slice(0, 5)
+//                   .map((node, index) => {
+//                     const capacity = getStorageCapacity(node);
+//                     const used = getStorageUsed(node);
+//                     return (
+//                       <tr
+//                         key={node.pubkey}
+//                         className="hover:bg-overlay-hover transition-colors group cursor-pointer"
+//                         onClick={() => onNodeClick?.(node)}
+//                       >
+//                         <td className="px-6 py-4 text-center">
+//                           {sortMetric === 'credit' ? (
+//                             <div className="flex flex-col items-center">
+//                               <span className="font-bold text-primary text-sm">
+//                                 {(node.credits ?? 0).toLocaleString()}
+//                               </span>
+//                               <span className="text-[9px] text-text-muted uppercase">XAND</span>
+//                             </div>
+//                           ) : (
+//                             <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold
+//                             ${index < 3 ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'bg-overlay-active text-text-muted'}
+//                           `}>
+//                               {index + 1}
+//                             </span>
+//                           )}
+//                         </td>
+//                         <td className="px-6 py-4 text-text-primary group-hover:text-primary transition-colors">
+//                           <div className="flex flex-col">
+//                             <span className="font-bold flex items-center gap-2">
+//                               {node.pubkey.substring(0, 8)}...
+//                               <span className={`w-1.5 h-1.5 rounded-full ${node.status === 'active' || node.status === 'online' ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
+//                             </span>
+//                             <span className="text-[10px] text-text-muted uppercase tracking-wider opacity-70">
+//                               {node.city || 'Unknown'}, {node.country || 'Unknown'}
+//                             </span>
+//                           </div>
+//                         </td>
+//                         <td className="px-6 py-4">
+//                           <div className="flex items-center">
+//                             <div className="w-16 h-1 bg-overlay-active rounded-full mr-2 overflow-hidden">
+//                               <div className="h-full bg-primary" style={{ width: `${capacity > 0 ? (used / capacity) * 100 : 0}%` }}></div>
+//                             </div>
+//                             <span className="font-mono text-primary font-bold">{formatBytes(capacity)}</span>
+//                           </div>
+//                         </td>
+//                         <td className="px-6 py-4 text-secondary font-bold">
+//                           {node.performance_score ?? node.uptime_score ?? 0}
+//                           <span className="text-[10px] font-normal text-text-muted ml-1">/ 100</span>
+//                         </td>
+//                         <td className="px-6 py-4 text-right">
+//                           <span className={`font-bold ${(node.response_time ?? 999) < 50 ? 'text-emerald-500' :
+//                             (node.response_time ?? 999) < 150 ? 'text-amber-500' : 'text-red-500'
+//                             }`}>
+//                             {node.response_time ?? 0} ms
+//                           </span>
+//                         </td>
+//                       </tr>
+//                     );
+//                   })}
+//               </tbody>
+//             </table>
+//           </div>
+//         </div>
+
+//       </div>
+//     </div>
+//   );
+// };

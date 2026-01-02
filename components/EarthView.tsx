@@ -1,6 +1,7 @@
 
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { PNode } from '../types/node.types';
+import { NetworkStats } from '../types/api.types';
 import { RefreshCw, Globe, Plus, Minus, Share2 } from 'lucide-react';
 
 // Deterministic pseudo-random helper
@@ -17,6 +18,7 @@ const getPseudoRandom = (seed: string) => {
 
 interface EarthViewProps {
   nodes: PNode[];
+  stats?: NetworkStats | null; // Added stats prop
   onNodeClick?: (node: PNode) => void;
   selectedNodeId?: string | null;
   lastUpdated?: Date | null;
@@ -29,9 +31,11 @@ const GEOJSON_URL = 'https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne
 // --- SHARED UTILS ---
 
 const getNodeColor = (status: string) => {
-  switch (status) {
-    case 'active': return '#008E7C'; // Secondary (Success)
-    case 'delinquent': return '#FE8300'; // Accent (Warning)
+  switch (status.toLowerCase()) {
+    case 'active':
+    case 'online': return '#008E7C'; // Secondary (Success)
+    case 'delinquent':
+    case 'warning': return '#FE8300'; // Accent (Warning)
     case 'offline': return '#f87171'; // Red
     default: return '#6E6E7E';
   }
@@ -371,7 +375,7 @@ const FlatMap: React.FC<{
 
 // --- MAIN COMPONENT ---
 
-export const EarthView: React.FC<EarthViewProps> = ({ nodes, onNodeClick, selectedNodeId, lastUpdated, refetch, isRefetching }) => {
+export const EarthView: React.FC<EarthViewProps> = ({ nodes, stats, onNodeClick, selectedNodeId, lastUpdated, refetch, isRefetching }) => {
   // Theme Detection if needed, but for now 2D map handles its own looks based on CSS vars
   // Keeping only the wrapper and Stats
 
@@ -398,7 +402,7 @@ export const EarthView: React.FC<EarthViewProps> = ({ nodes, onNodeClick, select
           </h3>
 
           {(() => {
-            // Calculate regional insights
+            // Calculate regional insights based on NODE COUNT (Density)
             const regionMap = new Map<string, { count: number; capacity: number }>();
             (nodes || []).forEach(n => {
               const region = n.country || 'Unknown';
@@ -411,19 +415,19 @@ export const EarthView: React.FC<EarthViewProps> = ({ nodes, onNodeClick, select
 
             const regions = Array.from(regionMap.entries())
               .map(([name, data]) => ({ name, ...data }))
-              .sort((a, b) => b.capacity - a.capacity);
+              .sort((a, b) => b.count - a.count); // Sort by COUNT for "Top Region"
 
             const topRegion = regions[0];
-            const totalCapacity = regions.reduce((sum, r) => sum + r.capacity, 0);
-            const topRegionPercent = topRegion ? (topRegion.capacity / totalCapacity * 100) : 0;
+            const totalNodes = stats?.total_nodes ?? nodes?.length ?? 0; // Use authoritative total if available
+            const topRegionPercent = (topRegion && totalNodes > 0) ? (topRegion.count / totalNodes * 100) : 0;
             const isConcentrated = topRegionPercent > 40;
 
             return (
               <>
                 <div className="space-y-2 mb-3">
                   <div className="flex justify-between items-center text-sm">
-                    <span className="text-text-secondary">pNodes</span>
-                    <span className="font-bold font-mono">{nodes?.length || 0}</span>
+                    <span className="text-text-secondary">Total Nodes</span>
+                    <span className="font-bold font-mono">{totalNodes}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-text-secondary">Regions</span>

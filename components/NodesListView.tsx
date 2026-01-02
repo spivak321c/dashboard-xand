@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { PNode } from '../types/node.types';
-import { PaginationMeta } from '../types/api.types';
+import { PaginationMeta, SortField, SortOrder as SortDirection } from '../types/api.types';
 import {
   Search,
   Filter,
@@ -13,22 +13,39 @@ import {
 } from 'lucide-react';
 import { NodeCard } from './NodeCard';
 import { NodeHybridCard } from './NodeHybridCard';
+import { copyToClipboard } from '../utils/clipboardUtils';
 
-interface NodesListViewProps {
+export interface NodesListViewProps {
   nodes: PNode[];
   onNodeClick?: (node: PNode) => void;
   pagination: PaginationMeta | null;
   currentPage: number;
   onPageChange: (page: number) => void;
+  // API Filter Callbacks
+  onStatusChange?: (status: string | undefined) => void;
+  onSortChange?: (sort: SortField | undefined) => void;
+  onOrderChange?: (order: SortDirection | undefined) => void;
+  onIncludeOfflineChange?: (include: boolean) => void;
 }
 
-type SortField = 'storage_capacity' | 'uptime_score' | 'response_time' | 'version' | 'status';
-type SortDirection = 'asc' | 'desc';
+// Internal component filter types
 type StatusFilter = 'all' | 'active' | 'delinquent' | 'offline';
 type RegisteredFilter = 'all' | 'registered' | 'unregistered';
+type VisibilityFilter = 'all' | 'public' | 'private';
 type ViewMode = 'grid' | 'list';
+export { type SortField, type SortDirection };
 
-export const NodesListView: React.FC<NodesListViewProps> = ({ nodes, onNodeClick, pagination, currentPage, onPageChange }) => {
+export const NodesListView: React.FC<NodesListViewProps> = ({
+  nodes,
+  onNodeClick,
+  pagination,
+  currentPage,
+  onPageChange,
+  onStatusChange,
+  onSortChange,
+  onOrderChange,
+  onIncludeOfflineChange
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -36,22 +53,55 @@ export const NodesListView: React.FC<NodesListViewProps> = ({ nodes, onNodeClick
   // Filter States
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [registeredFilter, setRegisteredFilter] = useState<RegisteredFilter>('all');
+  const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>('all');
+  const [versionFilter, setVersionFilter] = useState<string>('all');
+  const [includeOffline, setIncludeOffline] = useState(true);
+
+  const handleStatusChange = (status: StatusFilter) => {
+    setStatusFilter(status);
+    if (onStatusChange) {
+      // Convert 'all' to undefined for API
+      onStatusChange(status === 'all' ? undefined : status);
+    }
+  };
+
+  const handleIncludeOfflineChange = (include: boolean) => {
+    setIncludeOffline(include);
+    onIncludeOfflineChange?.(include);
+  };
+
+  // Compute unique versions available across all nodes
+  const availableVersions = useMemo(() => {
+    const versions = new Set<string>();
+    nodes.forEach(n => { if (n.version) versions.add(n.version); });
+    return Array.from(versions).sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' }));
+  }, [nodes]);
 
   // Sort States
-  const [sortField] = useState<SortField>('storage_capacity');
-  const [sortDirection] = useState<SortDirection>('desc');
+  const [sortField, setSortField] = useState<SortField>('storage');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [expandedNodeId, setExpandedNodeId] = useState<string | null>(null);
+
+  const handleSortChange = (field: SortField) => {
+    setSortField(field);
+    onSortChange?.(field);
+  };
+
+  const handleOrderChange = (dir: SortDirection) => {
+    setSortDirection(dir);
+    onOrderChange?.(dir);
+  };
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const handleCopy = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    try {
-      await navigator.clipboard.writeText(id);
+    const success = await copyToClipboard(id);
+    if (success) {
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
-    } catch (err) {
-      console.error('Clipboard copy failed:', err);
+    } else {
+      console.warn('Clipboard copy failed, using prompt as fallback');
       window.prompt('Copy to clipboard: Ctrl+C, Enter', id);
     }
   };
@@ -64,10 +114,12 @@ export const NodesListView: React.FC<NodesListViewProps> = ({ nodes, onNodeClick
       const term = searchTerm.toLowerCase();
       result = result.filter(n =>
         n.pubkey.toLowerCase().includes(term) ||
-        (n.ip?.includes(term) ?? n.ip_address?.includes(term) ?? false) ||
+        n.address.toLowerCase().includes(term) ||
+        (n.ip?.includes(term) ?? false) ||
         (n.country?.toLowerCase().includes(term)) ||
         (n.city?.toLowerCase().includes(term)) ||
-        (n.geo_info?.region && n.geo_info.region.toLowerCase().includes(term))
+        (n.version?.toLowerCase().includes(term)) ||
+        (n.status?.toLowerCase().includes(term))
       );
     }
 
@@ -79,33 +131,59 @@ export const NodesListView: React.FC<NodesListViewProps> = ({ nodes, onNodeClick
     // Registration Filter
     if (registeredFilter !== 'all') {
       const isReg = registeredFilter === 'registered';
-      result = result.filter(n => isReg ? (n.credits ?? 0) > 0 : (n.credits ?? 0) === 0);
+      result = result.filter(n => n.is_registered === isReg);
+    }
+
+    // Visibility Filter
+    if (visibilityFilter !== 'all') {
+      const isPublic = visibilityFilter === 'public';
+      result = result.filter(n => n.is_public === isPublic);
+    }
+
+    // Version Filter
+    if (versionFilter !== 'all') {
+      result = result.filter(n => n.version === versionFilter);
     }
 
     // Sorting
     result.sort((a, b) => {
-      let valA = a[sortField];
-      let valB = b[sortField];
+      let valA: number | string = 0;
+      let valB: number | string = 0;
 
-      if (sortField === 'storage_capacity' && valA === undefined) valA = (a.total_storage_tb || 0) * 1e12;
-      if (sortField === 'storage_capacity' && valB === undefined) valB = (b.total_storage_tb || 0) * 1e12;
-
-      if (valA === undefined) valA = 0;
-      if (valB === undefined) valB = 0;
-
-      if (sortField === 'status') {
-        const statusPriority = { active: 3, delinquent: 2, offline: 1, syncing: 0 };
-        valA = statusPriority[a.status as keyof typeof statusPriority] || 0;
-        valB = statusPriority[b.status as keyof typeof statusPriority] || 0;
+      switch (sortField) {
+        case 'uptime':
+          valA = a.uptime_score || 0;
+          valB = b.uptime_score || 0;
+          break;
+        case 'performance':
+          valA = a.performance_score || 0;
+          valB = b.performance_score || 0;
+          break;
+        case 'credits':
+          valA = a.credits || 0;
+          valB = b.credits || 0;
+          break;
+        case 'storage':
+          valA = a.storage_capacity || 0;
+          valB = b.storage_capacity || 0;
+          break;
+        case 'latency':
+          valA = a.response_time || 0;
+          valB = b.response_time || 0;
+          break;
+        default:
+          valA = 0;
+          valB = 0;
       }
+
       if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
       if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
     return result;
-  }, [nodes, searchTerm, sortField, sortDirection, statusFilter, registeredFilter]);
+  }, [nodes, searchTerm, sortField, sortDirection, statusFilter, registeredFilter, visibilityFilter, versionFilter]);
 
-  const activeFiltersCount = (statusFilter !== 'all' ? 1 : 0) + (registeredFilter !== 'all' ? 1 : 0);
+  const activeFiltersCount = (statusFilter !== 'all' ? 1 : 0) + (registeredFilter !== 'all' ? 1 : 0) + (visibilityFilter !== 'all' ? 1 : 0) + (versionFilter !== 'all' ? 1 : 0);
 
   return (
     <div className="flex flex-col h-full text-text-primary bg-root animate-in fade-in duration-500">
@@ -166,49 +244,133 @@ export const NodesListView: React.FC<NodesListViewProps> = ({ nodes, onNodeClick
           </div>
         </div>
 
-        {/* Expandable Filter Bar */}
         {showFilters && (
-          <div className="bg-elevated/50 p-4 rounded-xl border border-border-subtle grid grid-cols-1 md:grid-cols-3 gap-4 animate-in slide-in-from-top-2 duration-200">
-            <div>
-              <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2 block">Status</label>
-              <div className="flex space-x-2">
-                {(['all', 'active', 'delinquent', 'offline'] as StatusFilter[]).map(status => (
-                  <button
-                    key={status}
-                    onClick={() => setStatusFilter(status)}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium capitalize transition-all border ${statusFilter === status
-                      ? 'bg-surface border-primary text-primary shadow-sm'
-                      : 'bg-transparent border-transparent text-text-secondary hover:bg-overlay-hover'
-                      }`}
+          <div className="bg-elevated/50 p-4 rounded-xl border border-border-subtle flex flex-col gap-5 animate-in slide-in-from-top-2 duration-200">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div>
+                <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2 block">Status</label>
+                <div className="flex flex-wrap gap-2">
+                  {(['all', 'active', 'delinquent', 'offline'] as StatusFilter[]).map(status => (
+                    <button
+                      key={status}
+                      onClick={() => handleStatusChange(status)}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium capitalize transition-all border ${statusFilter === status
+                        ? 'bg-surface border-primary text-primary shadow-sm'
+                        : 'bg-transparent border-transparent text-text-secondary hover:bg-overlay-hover'
+                        }`}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Include Offline Toggle */}
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => handleIncludeOfflineChange(!includeOffline)}
+                  className={`flex items-center justify-center w-5 h-5 rounded border ${includeOffline ? 'bg-primary border-primary text-white' : 'border-border-strong bg-surface'}`}
+                >
+                  {includeOffline && <Terminal size={12} />}
+                </button>
+                <label className="text-xs font-medium text-text-secondary cursor-pointer" onClick={() => handleIncludeOfflineChange(!includeOffline)}>
+                  Include Offline Nodes
+                </label>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2 block">Registration</label>
+                <div className="flex flex-wrap gap-2">
+                  {(['all', 'registered', 'unregistered'] as RegisteredFilter[]).map(reg => (
+                    <button
+                      key={reg}
+                      onClick={() => setRegisteredFilter(reg)}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium capitalize transition-all border ${registeredFilter === reg
+                        ? 'bg-surface border-primary text-primary shadow-sm'
+                        : 'bg-transparent border-transparent text-text-secondary hover:bg-overlay-hover'
+                        }`}
+                    >
+                      {reg}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2 block">Visibility</label>
+                <div className="flex flex-wrap gap-2">
+                  {(['all', 'public', 'private'] as VisibilityFilter[]).map(vis => (
+                    <button
+                      key={vis}
+                      onClick={() => setVisibilityFilter(vis)}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium capitalize transition-all border ${visibilityFilter === vis
+                        ? 'bg-surface border-primary text-primary shadow-sm'
+                        : 'bg-transparent border-transparent text-text-secondary hover:bg-overlay-hover'
+                        }`}
+                    >
+                      {vis}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2 block">Node Version</label>
+                <select
+                  value={versionFilter}
+                  onChange={(e) => setVersionFilter(e.target.value)}
+                  className="w-full bg-surface border border-border-strong text-text-primary text-xs rounded-md p-1.5 outline-none focus:ring-1 focus:ring-primary shadow-sm"
+                >
+                  <option value="all">All Versions</option>
+                  {availableVersions.map(v => (
+                    <option key={v} value={v}>v{v}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2 block">Sort By</label>
+                <div className="flex gap-2">
+                  <select
+                    value={sortField}
+                    onChange={(e) => handleSortChange(e.target.value as SortField)}
+                    className="flex-1 bg-surface border border-border-strong text-text-primary text-xs rounded-md p-1.5 outline-none focus:ring-1 focus:ring-primary shadow-sm capitalize"
                   >
-                    {status}
+                    <option value="uptime">Uptime</option>
+                    <option value="performance">Performance</option>
+                    <option value="credits">Credits</option>
+                    <option value="storage">Storage</option>
+                    <option value="latency">Latency</option>
+                  </select>
+                  <button
+                    onClick={() => handleOrderChange(sortDirection === 'asc' ? 'desc' : 'asc')}
+                    className="px-2 py-1.5 bg-surface border border-border-strong rounded-md text-text-secondary hover:text-primary transition-colors"
+                    title="Toggle Sort Order"
+                  >
+                    {sortDirection === 'asc' ? '↑' : '↓'}
                   </button>
-                ))}
+                </div>
               </div>
             </div>
-            <div>
-              <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2 block">Registration</label>
-              <div className="flex space-x-2">
-                {(['all', 'registered', 'unregistered'] as RegisteredFilter[]).map(reg => (
-                  <button
-                    key={reg}
-                    onClick={() => setRegisteredFilter(reg)}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium capitalize transition-all border ${registeredFilter === reg
-                      ? 'bg-surface border-primary text-primary shadow-sm'
-                      : 'bg-transparent border-transparent text-text-secondary hover:bg-overlay-hover'
-                      }`}
-                  >
-                    {reg}
-                  </button>
-                ))}
+
+            <div className="flex items-center justify-between border-t border-border-subtle pt-3">
+              <div className="text-[10px] text-text-muted italic flex items-center">
+                Showing matches for {activeFiltersCount} active filters
               </div>
-            </div>
-            <div className="flex items-end justify-end">
               <button
-                onClick={() => { setStatusFilter('all'); setRegisteredFilter('all'); setSearchTerm(''); }}
-                className="text-xs text-text-muted hover:text-red-400 flex items-center px-3 py-1.5"
+                onClick={() => {
+                  handleStatusChange('all');
+                  setRegisteredFilter('all');
+                  setVisibilityFilter('all');
+                  setVersionFilter('all');
+                  handleSortChange('storage');
+                  handleOrderChange('desc');
+                  handleIncludeOfflineChange(true);
+                  setSearchTerm('');
+                }}
+                className="text-xs text-text-muted hover:text-red-400 flex items-center px-3 py-1.5 transition-colors"
               >
-                <XCircle size={14} className="mr-1" /> Reset Filters
+                <XCircle size={14} className="mr-1" /> Reset All Filters
               </button>
             </div>
           </div>

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Bell, Shield, Plus, Trash2, Save, Share2, Check, AlertTriangle, Zap, Search, Eye, Webhook, Globe, Loader2, RefreshCw } from 'lucide-react';
+import { Bell, Shield, Plus, Trash2, Save, Share2, Check, AlertTriangle, Zap, Search, Eye, Webhook, Globe, Loader2, RefreshCw, Send } from 'lucide-react';
 import { useAlerts } from '../hooks/useAlerts';
 import { Alert, CreateAlertRequest, AlertRuleType } from '../types/api.types';
+import { copyToClipboard } from '../utils/clipboardUtils';
 
 export const AlertsView: React.FC = () => {
     const { alerts, history, loading, error, createAlert, deleteAlert, updateAlert, fetchHistory, fetchAlerts } = useAlerts();
@@ -17,7 +18,7 @@ export const AlertsView: React.FC = () => {
     const [conditionValue, setConditionValue] = useState('offline');
     const [targetType, setTargetType] = useState<'global' | 'specific'>('global');
     const [targetNodeId, setTargetNodeId] = useState('');
-    const [channel, setChannel] = useState<'discord' | 'webhook' | 'email'>('discord');
+    const [channel, setChannel] = useState<'discord' | 'webhook' | 'email' | 'telegram'>('discord');
     const [webhookUrl, setWebhookUrl] = useState('');
 
     const [snippetCopied, setSnippetCopied] = useState(false);
@@ -50,7 +51,7 @@ export const AlertsView: React.FC = () => {
         setTargetNodeId(alert.conditions.node_id || '');
 
         if (alert.actions && alert.actions.length > 0) {
-            setChannel(alert.actions[0].type as 'discord' | 'webhook' | 'email');
+            setChannel(alert.actions[0].type as 'discord' | 'webhook' | 'email' | 'telegram');
             setWebhookUrl(alert.actions[0].config.url || '');
         }
     };
@@ -121,13 +122,12 @@ export const AlertsView: React.FC = () => {
 
     const exportConfig = async (alertConfig: Alert) => {
         const config = JSON.stringify(alertConfig, null, 2);
-        try {
-            await navigator.clipboard.writeText(config);
+        const success = await copyToClipboard(config);
+        if (success) {
             setSnippetCopied(true);
             setTimeout(() => setSnippetCopied(false), 2000);
-        } catch (err) {
-            console.error('Clipboard write failed:', err);
-            // Fallback or user notification
+        } else {
+            console.warn('Clipboard write failed, showing alert as fallback');
             window.alert('Clipboard access denied. Check console for config.');
             console.log(config);
         }
@@ -434,19 +434,26 @@ export const AlertsView: React.FC = () => {
                                             <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center"><Zap size={16} /></div>
                                             <span className="font-bold text-sm">Webhook</span>
                                         </button>
+                                        <button
+                                            onClick={() => setChannel('telegram')}
+                                            className={`flex-1 p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${channel === 'telegram' ? 'bg-[#0088cc]/10 border-[#0088cc] text-[#0088cc]' : 'bg-surface border-border-subtle text-text-muted opacity-60 hover:opacity-100'}`}
+                                        >
+                                            <div className="w-8 h-8 rounded-full bg-[#0088cc] text-white flex items-center justify-center"><Send size={16} /></div>
+                                            <span className="font-bold text-sm">Telegram</span>
+                                        </button>
                                     </div>
 
-                                    {channel === 'webhook' && (
+                                    {(channel === 'webhook' || channel === 'telegram') && (
                                         <div>
                                             <label className="text-xs font-bold text-text-muted uppercase mb-2 block">
-                                                Endpoint URL
+                                                {channel === 'webhook' ? 'Endpoint URL' : 'Telegram Bot Token / Chat ID'}
                                             </label>
                                             <input
                                                 type="text"
                                                 value={webhookUrl}
                                                 onChange={(e) => setWebhookUrl(e.target.value)}
                                                 className="w-full bg-surface border border-border-subtle rounded-lg p-3 text-text-primary focus:border-primary outline-none font-mono text-sm"
-                                                placeholder="https://..."
+                                                placeholder={channel === 'webhook' ? 'https://...' : 'TOKEN:CHAT_ID'}
                                             />
                                         </div>
                                     )}
@@ -462,8 +469,8 @@ export const AlertsView: React.FC = () => {
                                 </button>
                                 <button
                                     onClick={handleSave}
-                                    disabled={!name || (channel === 'webhook' && !webhookUrl) || saving}
-                                    className={`px-8 py-3 rounded-xl font-bold text-white shadow-lg transition-all flex items-center ${!name || (channel === 'webhook' && !webhookUrl) || saving ? 'bg-border-strong cursor-not-allowed' : 'bg-gradient-primary hover:brightness-110 shadow-primary/20'}`}
+                                    disabled={!name || ((channel === 'webhook' || channel === 'telegram') && !webhookUrl) || saving}
+                                    className={`px-8 py-3 rounded-xl font-bold text-white shadow-lg transition-all flex items-center ${!name || ((channel === 'webhook' || channel === 'telegram') && !webhookUrl) || saving ? 'bg-border-strong cursor-not-allowed' : 'bg-gradient-primary hover:brightness-110 shadow-primary/20'}`}
                                 >
                                     {saving ? <Loader2 size={18} className="mr-2 animate-spin" /> : <Save size={18} className="mr-2" />} {selectedAlert ? 'Update Sentinel' : 'Save Sentinel'}
                                 </button>

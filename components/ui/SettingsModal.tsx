@@ -79,7 +79,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
              </div>
           </div>
 
-          {/* RPC Endpoint */}
+          {/* RPC Endpoint
           <div className="space-y-3">
             <label className="text-sm font-semibold flex items-center">
               <Server className="w-4 h-4 mr-2 text-primary" />
@@ -92,7 +92,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
               className="w-full bg-root border border-border-subtle rounded-lg px-4 py-2.5 text-sm text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all font-mono placeholder:text-text-muted"
               placeholder="https://api.xandeum.network"
             />
-          </div>
+          </div> */}
 
           {/* Auto Refresh */}
           <div className="space-y-3">

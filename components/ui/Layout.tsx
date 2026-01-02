@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { LayoutDashboard, Globe, Terminal, Network, Settings, Menu, X, List, History, Coins, Bell, Calculator } from 'lucide-react';
 import { ViewMode } from '../../types';
 
@@ -12,7 +12,7 @@ interface LayoutProps {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children, currentView, onViewChange, onOpenSettings, network = 'mainnet', lastUpdated }) => {
-  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleNavClick = (view: ViewMode) => {
     onViewChange(view);
@@ -23,26 +23,28 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, onViewCha
     <div className="flex flex-col h-screen overflow-hidden bg-root text-text-primary">
 
       {/* Top Navbar */}
-      <header className="h-18 flex-shrink-0 z-30 bg-surface/90 backdrop-blur-md border-b border-border-subtle shadow-sm relative sticky top-0">
-        <div className="h-full px-4 lg:px-8 flex items-center justify-between">
+      <header className="h-16 flex-shrink-0 z-30 bg-surface/90 backdrop-blur-md border-b border-border-subtle shadow-sm relative sticky top-0">
+        <div className="h-full px-4 lg:px-6 flex items-center justify-between">
 
           {/* Logo Section */}
           <div
-            className="flex items-center gap-4 min-w-max group cursor-pointer"
+            className="flex items-center gap-3 min-w-max group cursor-pointer"
             onClick={() => handleNavClick(ViewMode.DASHBOARD)}
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-soft to-surface flex items-center justify-center border border-primary/20 shadow-[0_0_20px_var(--color-primary-soft)] transition-transform group-hover:scale-105">
-              <Network className="w-6 h-6 text-primary" />
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-soft to-surface flex items-center justify-center border border-primary/20 shadow-[0_0_20px_var(--color-primary-soft)] transition-transform group-hover:scale-105">
+              <Network className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <span className="font-extrabold text-xl tracking-tight text-text-primary block leading-none">
+              <span className="font-extrabold text-lg tracking-tight text-text-primary block leading-none">
                 XANDXPLORER
               </span>
             </div>
           </div>
 
           {/* Center Navigation - Desktop */}
-          <nav className="hidden lg:flex flex-1 items-center justify-start px-8 gap-1 overflow-x-auto custom-scrollbar">
+          <nav
+            className="hidden lg:flex flex-1 items-center justify-start px-8 gap-2 overflow-x-auto custom-scrollbar h-full"
+          >
             <NavItem icon={<LayoutDashboard size={18} />} label="Dashboard" isActive={currentView === ViewMode.DASHBOARD} onClick={() => handleNavClick(ViewMode.DASHBOARD)} />
             <NavItem icon={<List size={18} />} label="Nodes" isActive={currentView === ViewMode.NODES_LIST} onClick={() => handleNavClick(ViewMode.NODES_LIST)} />
             <NavItem icon={<Globe size={18} />} label="Topology" isActive={currentView === ViewMode.EXPLORER_3D} onClick={() => handleNavClick(ViewMode.EXPLORER_3D)} />
@@ -50,21 +52,20 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, onViewCha
             <NavItem icon={<Calculator size={18} />} label="Calculator" isActive={currentView === ViewMode.STORAGE_PLANNER} onClick={() => handleNavClick(ViewMode.STORAGE_PLANNER)} />
             <NavItem icon={<History size={18} />} label="Analytics" isActive={currentView === ViewMode.HISTORICAL_ANALYSIS} onClick={() => handleNavClick(ViewMode.HISTORICAL_ANALYSIS)} />
             <NavItem icon={<Coins size={18} />} label="$XAND" isActive={currentView === ViewMode.PURCHASE} onClick={() => handleNavClick(ViewMode.PURCHASE)} />
-            <div className="w-px h-6 bg-border-subtle mx-2"></div>
+            <div className="w-px h-5 bg-border-subtle mx-2"></div>
             <NavItem icon={<Terminal size={18} />} label="Playground" isActive={currentView === ViewMode.PLAYGROUND} onClick={() => handleNavClick(ViewMode.PLAYGROUND)} />
           </nav>
 
           {/* Right Actions */}
           <div className="flex items-center gap-3 min-w-max">
-            <div className="hidden md:flex items-center space-x-4 text-xs font-mono text-text-secondary bg-surface/50 backdrop-blur-sm px-4 py-2 rounded-full border border-border-subtle shadow-inner">
-
+            <div className="hidden md:flex items-center space-x-4 text-xs font-mono text-text-secondary bg-surface/50 backdrop-blur-sm px-4 py-1.5 rounded-full border border-border-subtle shadow-inner">
               {lastUpdated && (
                 <>
-                  <span className="w-px h-3 bg-border-subtle"></span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                   <span title={lastUpdated.toLocaleString()}>
-                    Updated {new Date().getTime() - lastUpdated.getTime() < 60000
-                      ? 'just now'
-                      : `${Math.floor((new Date().getTime() - lastUpdated.getTime()) / 60000)}m ago`}
+                    {new Date().getTime() - lastUpdated.getTime() < 60000
+                      ? 'LIVE'
+                      : `${Math.floor((new Date().getTime() - lastUpdated.getTime()) / 60000)}M AGO`}
                   </span>
                 </>
               )}
@@ -135,18 +136,18 @@ const NavItem: React.FC<{ icon: React.ReactNode; label: string; isActive: boolea
   return (
     <button
       onClick={onClick}
-      className={`flex items-center px-4 py-2 rounded-lg transition-all duration-300 group relative ${isActive
-        ? 'text-primary bg-primary-soft/30'
-        : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'
+      className={`flex items-center px-4 py-2 rounded-full transition-all duration-200 group relative select-none border
+        ${isActive
+          ? 'bg-primary/10 text-primary border-primary/20 shadow-sm'
+          : 'bg-transparent text-text-secondary border-transparent hover:bg-surface-hover hover:text-text-primary'
         }`}
     >
-      {isActive && (
-        <div className="absolute bottom-0 left-0 w-full h-[2px] bg-primary shadow-[0_0_8px_var(--color-primary)]"></div>
-      )}
-      <div className={`transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
+      <div className={`transition-transform duration-200 ${isActive ? 'scale-100' : 'group-hover:scale-105'}`}>
         {icon}
       </div>
-      <span className={`ml-2.5 font-medium text-xs tracking-wide whitespace-nowrap transition-colors ${isActive ? 'font-bold' : ''}`}>{label}</span>
+      <span className={`ml-2 font-medium text-xs tracking-wide whitespace-nowrap ${isActive ? 'font-bold' : 'font-medium'}`}>
+        {label}
+      </span>
     </button>
   );
 };

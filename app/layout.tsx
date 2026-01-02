@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import "./globals.css";
+import { ClientWalletProvider } from "@/components/ClientWalletProvider";
 
 export const metadata: Metadata = {
   title: "Xandeum pNode Explorer",
@@ -19,7 +21,10 @@ export default function RootLayout({
       <body
         className="antialiased min-h-screen transition-colors duration-300 font-sans"
       >
-        {children}
+        <Script src="https://cdn.jsdelivr.net/npm/bs58@5.0.0/index.min.js" strategy="beforeInteractive" />
+        <ClientWalletProvider>
+          {children}
+        </ClientWalletProvider>
       </body>
     </html>
   );

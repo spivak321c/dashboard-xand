@@ -1,7 +1,9 @@
 import React, { useMemo } from 'react';
-import { History, TrendingUp, Activity, Server, Database, Calendar, Download, Info, Loader2, RefreshCw } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, LineChart, Line, Legend } from 'recharts';
+import { History, TrendingUp, Activity, Server, Calendar, Download, Info, Loader2, RefreshCw } from 'lucide-react';
+import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, LineChart, Line, Legend } from 'recharts';
 import { useAnalytics } from '../hooks/useAnalytics';
+
+
 
 export const HistoricalAnalysis: React.FC = () => {
    const { networkHistory, loading, error, refresh } = useAnalytics();
@@ -16,10 +18,9 @@ export const HistoricalAnalysis: React.FC = () => {
          const date = new Date(snapshot.timestamp);
          return {
             day: date.toLocaleDateString(),
-            nodeCount: snapshot.total_nodes,
-            storageCommitted: snapshot.total_storage_pb * 1000, // Convert PB to TB for display if needed, or keep PB. Let's use TB for consistency with previous mock. 1 PB = 1000 TB.
-            avgUptime: snapshot.average_uptime,
-            networkTraffic: snapshot.average_performance, // Proxy for traffic/load
+            nodeCount: snapshot.total_nodes || 0,
+            avgUptime: snapshot.average_uptime || 0,
+            networkTraffic: snapshot.average_performance || 0,
          };
       });
    }, [networkHistory]);
@@ -31,9 +32,7 @@ export const HistoricalAnalysis: React.FC = () => {
 
       return {
          nodeGrowth: last.nodeCount - first.nodeCount,
-         nodeGrowthPercent: ((last.nodeCount - first.nodeCount) / first.nodeCount) * 100,
-         storageGrowth: last.storageCommitted - first.storageCommitted,
-         storageGrowthPercent: ((last.storageCommitted - first.storageCommitted) / first.storageCommitted) * 100,
+         nodeGrowthPercent: first.nodeCount > 0 ? ((last.nodeCount - first.nodeCount) / first.nodeCount) * 100 : 0,
          avgUptime: last.avgUptime // Current avg uptime
       };
    }, [historicalData]);
@@ -60,8 +59,13 @@ export const HistoricalAnalysis: React.FC = () => {
                </p>
             </div>
             <div className="flex gap-2">
-               <button onClick={() => refresh()} className="flex items-center px-4 py-2 bg-surface text-text-primary rounded-lg hover:bg-overlay-hover transition-colors border border-border-subtle text-xs font-mono">
-                  <RefreshCw size={14} className="mr-2" /> REFRESH
+               <button
+                  onClick={() => refresh()}
+                  disabled={loading}
+                  className="flex items-center px-4 py-2 bg-surface text-text-primary rounded-lg hover:bg-overlay-hover disabled:opacity-50 disabled:cursor-wait transition-all border border-border-subtle text-xs font-mono shadow-sm"
+               >
+                  <RefreshCw size={14} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+                  {loading ? 'SYNCING...' : 'REFRESH'}
                </button>
                <button className="flex items-center px-4 py-2 bg-surface text-text-primary rounded-lg hover:bg-overlay-hover transition-colors border border-border-subtle text-xs font-mono">
                   <Download size={14} className="mr-2" /> EXPORT_CSV
@@ -71,7 +75,7 @@ export const HistoricalAnalysis: React.FC = () => {
 
          {/* Summary Cards */}
          {stats && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                <div className="bg-surface border border-border-subtle rounded-2xl p-6 shadow-sm">
                   <div className="flex items-center gap-3 mb-4">
                      <div className="p-2 bg-primary-soft rounded-lg"><Server size={18} className="text-primary" /></div>
@@ -80,14 +84,7 @@ export const HistoricalAnalysis: React.FC = () => {
                   <div className="text-3xl font-black text-text-primary mb-1">{stats.nodeGrowth > 0 ? '+' : ''}{Math.floor(stats.nodeGrowth)}</div>
                   <p className="text-xs text-secondary flex items-center"><TrendingUp size={12} className="mr-1" /> {stats.nodeGrowthPercent.toFixed(1)}% change</p>
                </div>
-               <div className="bg-surface border border-border-subtle rounded-2xl p-6 shadow-sm">
-                  <div className="flex items-center gap-3 mb-4">
-                     <div className="p-2 bg-secondary-soft rounded-lg"><Database size={18} className="text-secondary" /></div>
-                     <span className="text-xs font-bold text-text-muted uppercase tracking-wider">Storage Expansion</span>
-                  </div>
-                  <div className="text-3xl font-black text-text-primary mb-1">{stats.storageGrowth > 0 ? '+' : ''}{stats.storageGrowth.toFixed(1)} TB</div>
-                  <p className="text-xs text-secondary flex items-center"><TrendingUp size={12} className="mr-1" /> {stats.storageGrowthPercent.toFixed(1)}% capacity expansion</p>
-               </div>
+
                <div className="bg-surface border border-border-subtle rounded-2xl p-6 shadow-sm">
                   <div className="flex items-center gap-3 mb-4">
                      <div className="p-2 bg-accent-soft/20 rounded-lg"><Activity size={18} className="text-accent" /></div>
@@ -100,7 +97,7 @@ export const HistoricalAnalysis: React.FC = () => {
          )}
 
          {/* Charts Section */}
-         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+         <div className="grid grid-cols-1 gap-8">
             {/* Node Count Over Time */}
             <div className="bg-surface border border-border-subtle rounded-2xl p-6 shadow-sm flex flex-col h-[400px]">
                <h3 className="text-sm font-bold text-text-muted uppercase tracking-wider mb-6 flex items-center">
@@ -121,34 +118,8 @@ export const HistoricalAnalysis: React.FC = () => {
                </div>
             </div>
 
-            {/* Storage Expansion Area Chart */}
-            <div className="bg-surface border border-border-subtle rounded-2xl p-6 shadow-sm h-[400px] flex flex-col">
-               <h3 className="text-sm font-bold text-text-muted uppercase tracking-wider mb-6 flex items-center">
-                  <Database size={16} className="mr-2" /> Storage Committed Expansion (TB)
-               </h3>
-               <div className="flex-1 w-full min-h-0">
-                  <ResponsiveContainer width="100%" height="100%">
-                     <AreaChart data={historicalData}>
-                        <defs>
-                           <linearGradient id="colorStorage" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="var(--color-secondary)" stopOpacity={0.3} />
-                              <stop offset="95%" stopColor="var(--color-secondary)" stopOpacity={0} />
-                           </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
-                        <XAxis dataKey="day" hide />
-                        <YAxis stroke="var(--text-muted)" fontSize={10} tickLine={false} axisLine={false} />
-                        <Tooltip
-                           contentStyle={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-strong)', color: 'var(--text-primary)', fontSize: '12px' }}
-                        />
-                        <Area type="monotone" dataKey="storageCommitted" stroke="var(--color-secondary)" fillOpacity={1} fill="url(#colorStorage)" strokeWidth={2} />
-                     </AreaChart>
-                  </ResponsiveContainer>
-               </div>
-            </div>
-
             {/* Network Utilization */}
-            <div className="lg:col-span-2 bg-surface border border-border-subtle rounded-2xl p-6 shadow-sm h-[350px] flex flex-col">
+            <div className="bg-surface border border-border-subtle rounded-2xl p-6 shadow-sm h-[350px] flex flex-col">
                <h3 className="text-sm font-bold text-text-muted uppercase tracking-wider mb-6 flex items-center">
                   <Activity size={16} className="mr-2" /> Multi-Metric Performance Telemetry
                </h3>

@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { X, Copy, Check, Server, Activity, Database, Clock, Radio, Globe, Share2 } from 'lucide-react';
 import { PNode } from '../types/node.types';
+import { formatBytes } from '../utils/formatUtils';
+import { copyToClipboard } from '../utils/clipboardUtils';
 
 interface NodeDetailPanelProps {
    node: PNode | null;
@@ -17,9 +19,10 @@ export const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({ node, onClose,
       setCopied(false);
    }
 
-   const handleCopy = () => {
-      if (node) {
-         navigator.clipboard.writeText(node.pubkey);
+   const handleCopy = async () => {
+      if (!node) return;
+      const success = await copyToClipboard(node.pubkey);
+      if (success) {
          setCopied(true);
          setTimeout(() => setCopied(false), 2000);
       }
@@ -71,20 +74,20 @@ export const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({ node, onClose,
 
                {/* Status Badge */}
                <div className="flex items-center space-x-3 bg-surface p-4 rounded-xl border border-border-subtle">
-                  <div className={`relative flex items-center justify-center w-12 h-12 rounded-full ${node.status === 'active' ? 'bg-secondary-soft' :
-                     node.status === 'delinquent' ? 'bg-accent/10' : 'bg-red-500/10'
+                  <div className={`relative flex items-center justify-center w-12 h-12 rounded-full ${(node.status === 'active' || node.status === 'online') ? 'bg-secondary-soft' :
+                     (node.status === 'delinquent' || node.status === 'warning') ? 'bg-accent/10' : 'bg-red-500/10'
                      }`}>
-                     <Activity className={`w-6 h-6 ${node.status === 'active' ? 'text-secondary' :
-                        node.status === 'delinquent' ? 'text-accent' : 'text-red-500'
+                     <Activity className={`w-6 h-6 ${(node.status === 'active' || node.status === 'online') ? 'text-secondary' :
+                        (node.status === 'delinquent' || node.status === 'warning') ? 'text-accent' : 'text-red-500'
                         }`} />
-                     <span className={`absolute top-0 right-0 w-3 h-3 rounded-full border-2 border-elevated ${node.status === 'active' ? 'bg-secondary' :
-                        node.status === 'delinquent' ? 'bg-accent' : 'bg-red-500'
+                     <span className={`absolute top-0 right-0 w-3 h-3 rounded-full border-2 border-elevated ${(node.status === 'active' || node.status === 'online') ? 'bg-secondary' :
+                        (node.status === 'delinquent' || node.status === 'warning') ? 'bg-accent' : 'bg-red-500'
                         }`}></span>
                   </div>
                   <div>
                      <p className="text-xs text-text-muted font-medium uppercase tracking-wider">Current Status</p>
-                     <p className={`text-lg font-semibold capitalize ${node.status === 'active' ? 'text-secondary' :
-                        node.status === 'delinquent' ? 'text-accent' : 'text-red-400'
+                     <p className={`text-lg font-semibold capitalize ${(node.status === 'active' || node.status === 'online') ? 'text-secondary' :
+                        (node.status === 'delinquent' || node.status === 'warning') ? 'text-accent' : 'text-red-400'
                         }`}>
                         {node.status}
                      </p>
@@ -151,7 +154,7 @@ export const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({ node, onClose,
                            {gossipPeers.map(peer => (
                               <div key={peer.pubkey} className="p-3 flex items-center justify-between hover:bg-overlay-hover transition-colors">
                                  <div className="flex items-center">
-                                    <div className={`w-2 h-2 rounded-full mr-2 ${peer.status === 'active' ? 'bg-secondary' : 'bg-accent'
+                                    <div className={`w-2 h-2 rounded-full mr-2 ${(peer.status === 'active' || peer.status === 'online') ? 'bg-secondary' : 'bg-accent'
                                        }`}></div>
                                     <div>
                                        <p className="text-xs font-mono text-text-primary">{peer.pubkey.substring(0, 8)}...</p>
@@ -180,13 +183,13 @@ export const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({ node, onClose,
                         <div className="flex items-center text-text-secondary text-sm">
                            <Database className="w-4 h-4 mr-3 opacity-50" /> Total Storage
                         </div>
-                        <span className="font-mono text-text-primary">{((node.storage_capacity ?? 0) / 1e12).toFixed(2)} TB</span>
+                        <span className="font-mono text-text-primary">{formatBytes(node.storage_capacity ?? 0)}</span>
                      </div>
                      <div className="p-3 flex justify-between items-center">
                         <div className="flex items-center text-text-secondary text-sm">
                            <Database className="w-4 h-4 mr-3 opacity-50" /> Used Storage
                         </div>
-                        <span className="font-mono text-text-primary">{((node.storage_used ?? 0) / 1e12).toFixed(2)} TB</span>
+                        <span className="font-mono text-text-primary">{formatBytes(node.storage_used ?? 0)}</span>
                      </div>
                      <div className="p-3 flex justify-between items-center">
                         <div className="flex items-center text-text-secondary text-sm">

@@ -7,8 +7,12 @@ import {
     Clock,
     Zap,
     Activity,
+    HardDrive,
+    Shield,
+    Coins,
     Server
 } from 'lucide-react';
+import { formatBytes } from '../utils/formatUtils';
 
 interface NodeCardProps {
     node: PNode;
@@ -71,10 +75,17 @@ export const NodeCard: React.FC<NodeCardProps> = ({ node, onNodeClick, copiedId,
                             Node {node.pubkey.substring(0, 4)}...{node.pubkey.substring(node.pubkey.length - 4)}
                         </h3>
 
-                        {/* Status Badge */}
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold border ${statusConfig.color}`}>
-                            {statusConfig.label}
-                        </span>
+                        {/* Status Badges */}
+                        <div className="flex flex-wrap gap-2">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusConfig.color}`}>
+                                {statusConfig.label}
+                            </span>
+                            {node.is_registered && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border bg-primary/10 text-primary border-primary/20">
+                                    <Shield size={10} className="mr-1" /> Registered
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -101,16 +112,7 @@ export const NodeCard: React.FC<NodeCardProps> = ({ node, onNodeClick, copiedId,
                 <div className="flex items-center gap-2 text-xs text-text-muted px-1">
                     <MapPin size={12} className="flex-shrink-0" />
                     <span className="truncate flex items-center gap-2">
-                        {node.all_ips && node.all_ips.length > 1 ? (
-                            <>
-                                <span>{node.all_ips[0]}</span>
-                                <span className="bg-primary/20 text-primary px-1.5 py-0.5 rounded text-[9px] font-bold">
-                                    +{node.all_ips.length - 1} MORE
-                                </span>
-                            </>
-                        ) : (
-                            <span>{node.ip || node.ip_address || 'N/A'}</span>
-                        )}
+                        <span className="font-mono">{node.address || node.ip}</span>
                         <span className="opacity-50">•</span> {node.city || 'Unknown'}, {node.country || 'Unknown'}
                     </span>
                 </div>
@@ -118,16 +120,18 @@ export const NodeCard: React.FC<NodeCardProps> = ({ node, onNodeClick, copiedId,
 
             {/* Performance Metrics */}
             <div className="space-y-3 flex-1">
-                {/* Uptime */}
+                {/* Storage Usage */}
                 <div>
                     <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-xs font-medium text-text-muted">Uptime</span>
-                        <span className="text-xs font-bold text-text-primary">{uptimePercent.toFixed(1)}%</span>
+                        <span className="text-xs font-medium text-text-muted">Storage</span>
+                        <span className="text-xs font-bold text-text-primary">
+                            {formatBytes(node.storage_used)} / {formatBytes(node.storage_capacity)}
+                        </span>
                     </div>
                     <div className="h-1.5 bg-overlay-active rounded-full overflow-hidden">
                         <div
-                            className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                            style={{ width: `${uptimePercent}%` }}
+                            className="h-full bg-primary rounded-full transition-all duration-500"
+                            style={{ width: `${node.storage_usage_percent * 100}%` }}
                         />
                     </div>
                 </div>
@@ -159,7 +163,7 @@ export const NodeCard: React.FC<NodeCardProps> = ({ node, onNodeClick, copiedId,
                         <div>
                             <div className="text-[10px] text-text-muted uppercase">Latency</div>
                             <div className="text-sm font-bold text-text-primary font-mono">
-                                {node.response_time ?? node.latency_ms ?? 0}ms
+                                {node.response_time ?? 0}ms
                             </div>
                         </div>
                     </div>
@@ -179,6 +183,17 @@ export const NodeCard: React.FC<NodeCardProps> = ({ node, onNodeClick, copiedId,
                 <div className="flex items-center gap-2 text-xs text-text-muted pt-2">
                     <Clock size={12} />
                     <span>Last seen {getRelativeTime(node.last_seen)}</span>
+                </div>
+
+                {/* Credits Indicator */}
+                <div className="flex items-center justify-between bg-primary/5 rounded-lg border border-primary/10 px-3 py-2 mt-2">
+                    <div className="flex items-center gap-2">
+                        <Coins size={14} className="text-primary" />
+                        <span className="text-[10px] text-text-muted uppercase font-bold tracking-wider">Credits</span>
+                    </div>
+                    <span className="text-sm font-bold text-primary font-mono">
+                        {(node.credits ?? 0).toLocaleString()} <small className="text-[10px] opacity-70">XAND</small>
+                    </span>
                 </div>
             </div>
         </div>

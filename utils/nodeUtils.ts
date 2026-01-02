@@ -10,27 +10,26 @@ export function groupNodesByPubKey(nodes: PNode[]): PNode[] {
     nodes.forEach(node => {
         const existing = grouped.get(node.pubkey);
         if (existing) {
-            // Merge IP addresses if they are different
-            const currentIps = (existing.all_ips || [existing.ip || existing.address]).filter(Boolean);
-            const newNodeIp = node.ip || node.address;
+            // Merge unique addresses
+            const currentAddresses = existing.all_ips || [existing.address];
+            const newAddress = node.address;
 
-            if (newNodeIp && !currentIps.includes(newNodeIp)) {
-                existing.all_ips = [...currentIps, newNodeIp];
-                // Keep the 'ip' field as a comma-separated string for easy display in legacy components
-                existing.ip = existing.all_ips.join(', ');
+            if (newAddress && !currentAddresses.includes(newAddress)) {
+                existing.all_ips = [...currentAddresses, newAddress];
+                // Keep 'address' as the primary field for identification
             }
 
-            // Optionally merge other fields if needed, like keeping the most recent 'last_seen'
+            // Keep the most recent 'last_seen'
             if (new Date(node.last_seen || 0) > new Date(existing.last_seen || 0)) {
                 existing.last_seen = node.last_seen;
                 existing.status = node.status;
+                existing.is_online = node.is_online;
             }
         } else {
             // Clone the node and initialize all_ips
             const newNode = { ...node };
-            const initialIp = node.ip || node.address;
-            if (initialIp) {
-                newNode.all_ips = [initialIp];
+            if (node.address) {
+                newNode.all_ips = [node.address];
             } else {
                 newNode.all_ips = [];
             }
